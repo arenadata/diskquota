@@ -84,13 +84,13 @@ init_shm_worker_active_tables(void)
 
 	memset(&ctl, 0, sizeof(ctl));
 
-	ctl.keysize = sizeof(DiskQuotaActiveTableFileEntry);
-	ctl.entrysize = sizeof(DiskQuotaActiveTableFileEntry);
+	ctl.keysize = sizeof(DiskQuotaActiveTableFileEntry) * 50;
+	ctl.entrysize = sizeof(DiskQuotaActiveTableFileEntry) * 51;
 	ctl.hash = tag_hash;
 
 	active_tables_map = ShmemInitHash("active_tables",
-									  diskquota_max_active_tables,
-									  diskquota_max_active_tables,
+									  16,
+									  32,
 									  &ctl,
 									  HASH_ELEM | HASH_FUNCTION);
 }

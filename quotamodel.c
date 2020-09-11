@@ -48,7 +48,7 @@
 #include "diskquota.h"
 
 /* cluster level max size of black list */
-#define MAX_DISK_QUOTA_BLACK_ENTRIES (1024 * 1024)
+#define MAX_DISK_QUOTA_BLACK_ENTRIES (1024 * 285)
 /* cluster level init size of black list */
 #define INIT_DISK_QUOTA_BLACK_ENTRIES 8192
 /* per database level max size of black list */
@@ -205,7 +205,7 @@ disk_quota_shmem_startup(void)
 	hash_ctl.hash = tag_hash;
 
 	disk_quota_black_map = ShmemInitHash("blackmap whose quota limitation is reached",
-										 INIT_DISK_QUOTA_BLACK_ENTRIES,
+										 MAX_DISK_QUOTA_BLACK_ENTRIES,
 										 MAX_DISK_QUOTA_BLACK_ENTRIES,
 										 &hash_ctl,
 										 HASH_ELEM | HASH_FUNCTION);
@@ -243,8 +243,8 @@ DiskQuotaShmemSize(void)
 	Size		size;
 
 	size = sizeof(ExtensionDDLMessage);
-	size = add_size(size, hash_estimate_size(MAX_DISK_QUOTA_BLACK_ENTRIES, sizeof(BlackMapEntry)));
-	size = add_size(size, hash_estimate_size(diskquota_max_active_tables, sizeof(DiskQuotaActiveTableEntry)));
+	// size = add_size(size, hash_estimate_size(1, sizeof(BlackMapEntry)));
+	// size = add_size(size, hash_estimate_size(1, sizeof(DiskQuotaActiveTableEntry)));
 	return size;
 }
 
