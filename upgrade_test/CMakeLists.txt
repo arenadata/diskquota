@@ -34,14 +34,6 @@ foreach(ddl IN LISTS ddl_files)
   endif()
 endforeach()
 
-# if DDL file modified, insure the last release file passed in
-if(DISKQUOTA_DDL_MODIFIED AND NOT DEFINED DISKQUOTA_LAST_RELEASE_PATH)
-  message(
-    FATAL_ERROR
-      "DDL file modify detected, upgrade test is required. Add -DDISKQUOTA_LAST_RELEASE_PATH=/<path>/diskquota-<version>-<os>_<arch>.tar.gz. And re-try the generation"
-  )
-endif()
-
 # check if current version is compatible with the upgrade strategy
 if(DISKQUOTA_DDL_MODIFIED AND DEFINED DISKQUOTA_LAST_RELEASE_PATH)
   message(NOTICE "current version ${DISKQUOTA_VERSION}")
