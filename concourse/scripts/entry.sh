@@ -132,11 +132,6 @@ function create_fake_gpdb_src() {
         --without-zstd \
         --disable-orca --disable-gpcloud --enable-debug-extensions
     popd
-
-    local fake_root
-    fake_root=$(dirname "${fake_gpdb_src}")
-    mkdir -p "${fake_root}"
-    ln -s /home/gpadmin/gpdb_src "${fake_gpdb_src}"
 }
 
 # Setup common environment
