@@ -29,7 +29,7 @@ SELECT diskquota.init_table_size_table();
 -----------------------
                        
 (1 row)
-SELECT check_worker_presence(current_database(), 3);
+SELECT check_worker_presence(current_database(), current_setting('diskquota.worker_timeout')::int / 2);
  check_worker_presence 
 -----------------------
  f                     

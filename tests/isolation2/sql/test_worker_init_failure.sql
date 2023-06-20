@@ -31,5 +31,6 @@ SELECT check_worker_presence(current_database(), 0);
 SELECT gp_inject_fault('diskquota_worker_initialization', 'error', dbid)
   FROM gp_segment_configuration WHERE role='p' AND content=-1;
 SELECT diskquota.init_table_size_table();
-SELECT check_worker_presence(current_database(), 3);
+SELECT check_worker_presence(current_database(),
+  current_setting('diskquota.worker_timeout')::int / 2);
 DROP EXTENSION diskquota;
