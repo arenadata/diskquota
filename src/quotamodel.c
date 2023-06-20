@@ -794,6 +794,7 @@ refresh_disk_quota_usage(DiskquotaDBEntry *dbEntry)
 	bool  ret                         = true;
 	bool  is_init                     = !dbEntry->inited;
 	HTAB *local_active_table_stat_map = NULL;
+
 	StartTransactionCommand();
 
 	/*
