@@ -786,8 +786,8 @@ disk_quota_launcher_main(Datum main_arg)
 
 		/*
 		 * When db list is empty, curDB is NULL.
-		 * When curDB->in_use is false means dbEtnry has been removed
-		 * When curDB->dbid doesn't equal curDBId, it means the slot has
+		 * When curDB->in_use is false means dbEtnry has been romoved
+		 * When curDB->dbid doesn't equtal curDBId, it means the slot has
 		 * been used by another db
 		 * When curDB->corrupted is true means worker couldn't initialize
 		 * the extension in the first run.

@@ -34,5 +34,13 @@ SELECT check_worker_presence(current_database(), current_setting('diskquota.work
 -----------------------
  f                     
 (1 row)
+-- Reload configuration and check that worker is up again
+!\retcode gpstop -u;
+(exited with code 0)
+SELECT check_worker_presence(current_database(), current_setting('diskquota.worker_timeout')::int / 2);
+ check_worker_presence 
+-----------------------
+ t                     
+(1 row)
 DROP EXTENSION diskquota;
 DROP

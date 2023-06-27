@@ -33,4 +33,8 @@ SELECT gp_inject_fault('diskquota_worker_initialization', 'error', dbid)
 SELECT diskquota.init_table_size_table();
 SELECT check_worker_presence(current_database(),
   current_setting('diskquota.worker_timeout')::int / 2);
+-- Reload configuration and check that worker is up again
+!\retcode gpstop -u;
+SELECT check_worker_presence(current_database(),
+  current_setting('diskquota.worker_timeout')::int / 2);
 DROP EXTENSION diskquota;
