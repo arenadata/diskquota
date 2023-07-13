@@ -765,6 +765,7 @@ disk_quota_launcher_main(Datum main_arg)
 			got_sighup = false;
 			resetBackgroundWorkerCorruption();
 			ProcessConfigFile(PGC_SIGHUP);
+			SIMPLE_FAULT_INJECTOR("diskquota_launcher_sighup");
 		}
 
 		/*
@@ -777,6 +778,7 @@ disk_quota_launcher_main(Datum main_arg)
 			elog(DEBUG1, "[diskquota] got sigusr1");
 			got_sigusr1 = false;
 			sigusr1     = true;
+			SIMPLE_FAULT_INJECTOR("diskquota_launcher_sigusr1");
 		}
 
 		/*
