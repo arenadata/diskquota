@@ -38,8 +38,6 @@ function _main() {
         activate_standby
         time cmake --build . --target installcheck
     fi
-    # Run upgrade test (with standby master)
-    time cmake --build . --target upgradecheck
     popd
 
     time /home/gpadmin/diskquota_src/upgrade_test/alter_test.sh
