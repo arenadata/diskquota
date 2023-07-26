@@ -40,7 +40,10 @@ function _main() {
     fi
     popd
 
-    time /home/gpadmin/diskquota_src/upgrade_test/alter_test.sh
+    # TODO: existing upgrade and alter tests are useless for ADB
+    # - previous releases incompatible with current on PG-module version check
+    # - our upgrade process exclude existing of previous versions during upgrade
+    # time /home/gpadmin/diskquota_src/upgrade_test/alter_test.sh
 }
 
 _main
