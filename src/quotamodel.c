@@ -992,7 +992,7 @@ calculate_table_disk_usage(bool is_init, HTAB *local_active_table_stat_map)
 			key.id     = TableSizeEntryId(cur_segid);
 
 			uint32 counter = pg_atomic_read_u32(diskquota_table_size_entry_num);
-			if (counter > MAX_NUM_TABLE_SIZE_ENTRIES)
+			if (counter > diskquota_max_table_segments)
 			{
 				tsentry = (TableSizeEntry *)hash_search(table_size_map, &key, HASH_FIND, &table_size_map_found);
 				/* Too many tables have been added to the table_size_map, to avoid diskquota using
@@ -1010,7 +1010,7 @@ calculate_table_disk_usage(bool is_init, HTAB *local_active_table_stat_map)
 				if (!table_size_map_found)
 				{
 					counter = pg_atomic_add_fetch_u32(diskquota_table_size_entry_num, 1);
-					if (counter > MAX_NUM_TABLE_SIZE_ENTRIES)
+					if (counter > diskquota_max_table_segments)
 					{
 						ereport(WARNING, (errmsg("[diskquota] the number of tables exceeds the limit, please increase "
 						                         "the GUC value for diskquota.max_table_segments. Current "
