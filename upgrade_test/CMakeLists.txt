@@ -37,12 +37,12 @@ exec_program(
 )
 
 # check whether DDL file (*.sql) is modified
-file(GLOB ddl_files ${CMAKE_SOURCE_DIR}/*.sql)
+file(GLOB ddl_files ${CMAKE_SOURCE_DIR}/control/ddl/*.sql)
 foreach(ddl IN LISTS ddl_files)
   cmake_path(GET ddl FILENAME ddl)
   exec_program(
     git ${CMAKE_SOURCE_DIR} ARGS
-    diff ${latest_tag} --exit-code ${ddl}
+    diff ${latest_tag} --exit-code control/ddl/${ddl}
     OUTPUT_VARIABLE NULL
     RETURN_VALUE "${ddl}_modified")
 
