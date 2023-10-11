@@ -164,6 +164,6 @@ list(FILTER sql_files EXCLUDE REGEX ".*diskquota--${DISKQUOTA_MAJOR_VERSION}.${D
 if(NOT DEFINED DISKQUOTA_LAST_RELEASE_PATH)
   foreach(so IN LISTS sql_files)
     string(REGEX REPLACE "^diskquota--([0-9]+)\.([0-9]+).sql$" "diskquota-\\1.\\2.so" so ${so})
-    install(CODE "execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ${DISKQUOTA_BINARY_NAME}.so \"\$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/#postgresql/${so}\")")
+    install(CODE "execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ${DISKQUOTA_BINARY_NAME}.so \"\$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/postgresql/${so}\")")
   endforeach()
 endif()
