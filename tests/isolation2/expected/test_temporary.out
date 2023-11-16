@@ -1,0 +1,41 @@
+1: CREATE SCHEMA temporary_schema;
+CREATE
+1: SET search_path TO temporary_schema;
+SET
+1: SELECT diskquota.set_schema_quota('temporary_schema', '1 MB');
+ set_schema_quota 
+------------------
+                  
+(1 row)
+1: SELECT diskquota.wait_for_worker_new_epoch();
+ wait_for_worker_new_epoch 
+---------------------------
+ t                         
+(1 row)
+1: CREATE TEMPORARY TABLE temporary_table(id int) DISTRIBUTED BY (id);
+CREATE
+1: INSERT INTO temporary_table SELECT generate_series(1, 100000);
+INSERT 100000
+1: SELECT diskquota.wait_for_worker_new_epoch();
+ wait_for_worker_new_epoch 
+---------------------------
+ t                         
+(1 row)
+1q: ... <quitting>
+
+!\retcode gpstop -afr;
+-- start_ignore
+-- end_ignore
+(exited with code 0)
+
+1: SELECT pg_table_size('temporary_table'::regclass::oid) size;
+ERROR:  relation "temporary_table" does not exist
+LINE 1: SELECT pg_table_size('temporary_table'::regclass::oid) size;
+                             ^
+1: SELECT size FROM diskquota.table_size WHERE NOT EXISTS (SELECT 1 FROM pg_class WHERE tableid = oid) AND segid = -1;
+ size 
+------
+(0 rows)
+1: DROP SCHEMA temporary_schema CASCADE;
+DROP
+1q: ... <quitting>
