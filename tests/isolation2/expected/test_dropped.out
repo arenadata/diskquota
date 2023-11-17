@@ -1,3 +1,5 @@
+-- Ensure diskquota does not save information about dropped table during restart cluster
+
 1: CREATE SCHEMA dropped_schema;
 CREATE
 1: SET search_path TO dropped_schema;
@@ -16,6 +18,7 @@ SET
 CREATE
 1: INSERT INTO dropped_table SELECT generate_series(1, 100000);
 INSERT 100000
+-- Wait for the diskquota bgworker refreshing the size of 'dropped_table'.
 1: SELECT diskquota.wait_for_worker_new_epoch();
  wait_for_worker_new_epoch 
 ---------------------------
@@ -25,18 +28,21 @@ INSERT 100000
 DROP
 1q: ... <quitting>
 
+-- Restart cluster fastly
 !\retcode gpstop -afr;
 -- start_ignore
 -- end_ignore
 (exited with code 0)
 
-1: SELECT pg_table_size('dropped_table'::regclass::oid) size;
-ERROR:  relation "dropped_table" does not exist
-LINE 1: SELECT pg_table_size('dropped_table'::regclass::oid) size;
-                             ^
-1: SELECT size FROM diskquota.table_size WHERE NOT EXISTS (SELECT 1 FROM pg_class WHERE tableid = oid) AND segid = -1;
- size 
-------
+-- Indicates that there is no dropped table in pg_catalog.pg_class
+1: SELECT oid FROM pg_catalog.pg_class WHERE relname = 'dropped_table';
+ oid 
+-----
+(0 rows)
+-- Indicates that there are no entries in diskquota.table_size that are not present in pg_catalog.pg_class
+1: SELECT tableid FROM diskquota.table_size WHERE NOT EXISTS (SELECT 1 FROM pg_catalog.pg_class WHERE tableid = oid) AND segid = -1;
+ tableid 
+---------
 (0 rows)
 1: DROP SCHEMA dropped_schema CASCADE;
 DROP

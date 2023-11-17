@@ -1294,7 +1294,8 @@ out:
  * Get the list of oids of the tables which diskquota
  * needs to care about in the database.
  * Firstly the all the table oids which relkind is 'r'
- * or 'm' and not system table.
+ * or 'm' and not system table. On init stage, oids from
+ * diskquota.table_size are added to invalidate them.
  * Then, fetch the indexes of those tables.
  */
 
