@@ -1,4 +1,4 @@
--- Ensure diskquota does not save information about temporary table during restart cluster
+-- Ensure diskquota does not save information about temporary table during restart cluster by invalidates it at startup
 
 1: CREATE SCHEMA temporary_schema;
 1: SET search_path TO temporary_schema;

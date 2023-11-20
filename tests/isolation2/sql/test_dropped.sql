@@ -1,4 +1,4 @@
--- Ensure diskquota does not save information about dropped table during restart cluster
+-- Ensure diskquota does not save information about dropped table during restart cluster by invalidates it at startup
 
 1: CREATE SCHEMA dropped_schema;
 1: SET search_path TO dropped_schema;
