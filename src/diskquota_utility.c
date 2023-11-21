@@ -113,8 +113,6 @@ static float4 get_per_segment_ratio(Oid spcoid);
 static bool   to_delete_quota(QuotaType type, int64 quota_limit_mb, float4 segratio);
 static void   check_role(Oid roleoid, char *rolname, int64 quota_limit_mb);
 
-List *get_rel_oid_list(bool is_init);
-
 /* ---- Help Functions to set quota limit. ---- */
 /*
  * Initialize table diskquota.table_size.
@@ -1306,11 +1304,11 @@ get_rel_oid_list(bool is_init)
 	int   ret;
 
 #define SELECT_FROM_PG_CATALOG_PG_CLASS \
-	"select oid from pg_catalog.pg_class where oid >= $1 and (relkind='r' or relkind='m')"
-#define SELECT_FROM_DISKQUOTA_TABLE_SIZE "select tableid from diskquota.table_size where segid = -1"
+	"select oid from pg_catalog.pg_class where oid >= $1 and relkind in ('r', 'm')"
 
 	ret = SPI_execute_with_args(is_init ? SELECT_FROM_PG_CATALOG_PG_CLASS
-	                                    " union distinct " SELECT_FROM_DISKQUOTA_TABLE_SIZE
+	                                    " union distinct"
+	                                    " select tableid from diskquota.table_size where segid = -1"
 	                                    : SELECT_FROM_PG_CATALOG_PG_CLASS,
 	                            1,
 	                            (Oid[]){
@@ -1320,6 +1318,9 @@ get_rel_oid_list(bool is_init)
 	                                    ObjectIdGetDatum(FirstNormalObjectId),
 	                            },
 	                            NULL, false, 0);
+
+#undef SELECT_FROM_PG_CATALOG_PG_CLASS
+
 	if (ret != SPI_OK_SELECT) elog(ERROR, "cannot fetch in pg_class. error code %d", ret);
 
 	TupleDesc tupdesc = SPI_tuptable->tupdesc;
