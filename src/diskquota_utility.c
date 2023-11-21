@@ -1303,8 +1303,7 @@ get_rel_oid_list(bool is_init)
 	List *oidlist = NIL;
 	int   ret;
 
-#define SELECT_FROM_PG_CATALOG_PG_CLASS \
-	"select oid from pg_catalog.pg_class where oid >= $1 and relkind in ('r', 'm')"
+#define SELECT_FROM_PG_CATALOG_PG_CLASS "select oid from pg_catalog.pg_class where oid >= $1 and relkind in ('r', 'm')"
 
 	ret = SPI_execute_with_args(is_init ? SELECT_FROM_PG_CATALOG_PG_CLASS
 	                                    " union distinct"
