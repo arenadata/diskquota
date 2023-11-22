@@ -150,6 +150,7 @@ BuildInfo_Create(${build_info_PATH}
 
 # Add installcheck targets
 add_subdirectory(tests)
+add_subdirectory(upgrade_test)
 
 # NOTE: keep install part at the end of file, to overwrite previous binary
 install(PROGRAMS "cmake/install_gpdb_component" DESTINATION ".")
@@ -160,7 +161,9 @@ install(FILES ${build_info_PATH} DESTINATION ".")
 file(GLOB sql_files RELATIVE ${DISKQUOTA_DDL_DIR} "${DISKQUOTA_DDL_DIR}/diskquota--2.*.sql")
 list(FILTER sql_files EXCLUDE REGEX ".*--.*--.*")
 list(FILTER sql_files EXCLUDE REGEX ".*diskquota--${DISKQUOTA_MAJOR_VERSION}.${DISKQUOTA_MINOR_VERSION}.*")
-foreach(so IN LISTS sql_files)
-  string(REGEX REPLACE "^diskquota--([0-9]+)\.([0-9]+).sql$" "diskquota-\\1.\\2.so" so ${so})
-  install(CODE "execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ${DISKQUOTA_BINARY_NAME}.so \"\$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/postgresql/${so}\")")
-endforeach()
+if(NOT DEFINED DISKQUOTA_LAST_RELEASE_PATH)
+  foreach(so IN LISTS sql_files)
+    string(REGEX REPLACE "^diskquota--([0-9]+)\.([0-9]+).sql$" "diskquota-\\1.\\2.so" so ${so})
+    install(CODE "execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ${DISKQUOTA_BINARY_NAME}.so \"\$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}/lib/postgresql/${so}\")")
+  endforeach()
+endif()
