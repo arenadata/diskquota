@@ -78,6 +78,7 @@ int  diskquota_max_workers             = 10;
 int  diskquota_max_table_segments      = 0;
 int  diskquota_max_monitored_databases = 0;
 int  diskquota_max_quota_probes        = 0;
+time_t diskquota_hashmap_overflow_report_timeout = 0;
 
 DiskQuotaLocks       diskquota_locks;
 ExtensionDDLMessage *extension_ddl_message = NULL;
@@ -414,6 +415,9 @@ define_guc_variables(void)
 	DefineCustomIntVariable("diskquota.max_quota_probes", "Max number of quotas on the cluster.", NULL,
 	                        &diskquota_max_quota_probes, 1024 * 1024, 1024 * INIT_QUOTA_MAP_ENTRIES, INT_MAX,
 	                        PGC_POSTMASTER, 0, NULL, NULL, NULL);
+	DefineCustomIntVariable("diskquota.hashmap_overflow_report_timeout",
+	                        "Time interval in seconds between shared hash map overflow report.", NULL,
+	                        &diskquota_hashmap_overflow_report_timeout, 60, 0, INT_MAX, PGC_SUSET, 0, NULL, NULL, NULL);
 }
 
 /* ---- Functions for disk quota worker process ---- */

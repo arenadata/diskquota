@@ -190,6 +190,21 @@ static HTAB *table_size_map = NULL;
 static HTAB *disk_quota_reject_map       = NULL;
 static HTAB *local_disk_quota_reject_map = NULL;
 
+static time_t disk_quota_reject_last_overflow_report       = 0;
+static time_t local_disk_quota_reject_last_overflow_report = 0;
+
+#define REJECT_MAP_ENTER(keyPtr, foundPtr)                                                 \
+	shm_hash_enter(disk_quota_reject_map, keyPtr, foundPtr, MAX_DISK_QUOTA_REJECT_ENTRIES, \
+	               "[diskquota] Shared disk quota reject map size limit reached."          \
+	               "Some out-of-limit schemas or roles will be lost"                       \
+	               "in rejectmap.",                                                        \
+	               &disk_quota_reject_last_overflow_report)
+
+#define LOCAL_REJECT_MAP_ENTER(keyPtr, foundPtr)                                                 \
+	shm_hash_enter(local_disk_quota_reject_map, keyPtr, foundPtr, MAX_DISK_QUOTA_REJECT_ENTRIES, \
+	               "[diskquota] the number of local reject map entries reached the limit (%d)",  \
+	               &local_disk_quota_reject_last_overflow_report)
+
 static shmem_startup_hook_type prev_shmem_startup_hook = NULL;
 
 /* functions to maintain the quota maps */
@@ -326,9 +341,12 @@ add_quota_to_rejectmap(QuotaType type, Oid targetOid, Oid tablespaceoid, bool se
 	keyitem.tablespaceoid = tablespaceoid;
 	keyitem.targettype    = (uint32)type;
 	ereport(DEBUG1, (errmsg("[diskquota] Put object %u to rejectmap", targetOid)));
-	localrejectentry = (LocalRejectMapEntry *)hash_search(local_disk_quota_reject_map, &keyitem, HASH_ENTER, NULL);
-	localrejectentry->isexceeded  = true;
-	localrejectentry->segexceeded = segexceeded;
+	localrejectentry = (LocalRejectMapEntry *)LOCAL_REJECT_MAP_ENTER(&keyitem, NULL);
+	if (localrejectentry)
+	{
+		localrejectentry->isexceeded  = true;
+		localrejectentry->segexceeded = segexceeded;
+	}
 }
 
 /*
@@ -1305,13 +1323,9 @@ flush_local_reject_map(void)
 		 */
 		if (localrejectentry->isexceeded)
 		{
-			rejectentry = (GlobalRejectMapEntry *)hash_search(disk_quota_reject_map, (void *)&localrejectentry->keyitem,
-			                                                  HASH_ENTER_NULL, &found);
+			rejectentry = (GlobalRejectMapEntry *)REJECT_MAP_ENTER(&localrejectentry->keyitem, &found);
 			if (rejectentry == NULL)
 			{
-				ereport(WARNING, (errmsg("[diskquota] Shared disk quota reject map size limit reached."
-				                         "Some out-of-limit schemas or roles will be lost"
-				                         "in rejectmap.")));
 				continue;
 			}
 			/* new db objects which exceed quota limit */
@@ -2145,7 +2159,7 @@ refresh_rejectmap(PG_FUNCTION_ARGS)
 		 */
 		if (OidIsValid(rejectmapentry->keyitem.targetoid)) continue;
 
-		new_entry = hash_search(disk_quota_reject_map, &rejectmapentry->keyitem, HASH_ENTER_NULL, &found);
+		new_entry = REJECT_MAP_ENTER(&rejectmapentry->keyitem, &found);
 		if (!found && new_entry) memcpy(new_entry, rejectmapentry, sizeof(GlobalRejectMapEntry));
 	}
 	LWLockRelease(diskquota_locks.reject_map_lock);
