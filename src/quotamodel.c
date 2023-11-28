@@ -473,7 +473,7 @@ disk_quota_shmem_startup(void)
 	hash_ctl.keysize   = sizeof(RejectMapEntry);
 	hash_ctl.entrysize = sizeof(GlobalRejectMapEntry);
 	disk_quota_reject_map =
-	        DiskquotaShmemInitHash("rejectmap whose quota limitation is reached", INIT_DISK_QUOTA_REJECT_ENTRIES,
+	        DiskquotaShmemInitHash("rejectmap whose quota limitation is reached", MAX_DISK_QUOTA_REJECT_ENTRIES,
 	                               MAX_DISK_QUOTA_REJECT_ENTRIES, &hash_ctl, HASH_ELEM, DISKQUOTA_TAG_HASH);
 
 	init_shm_worker_active_tables();
@@ -582,8 +582,8 @@ init_disk_quota_model(uint32 id)
 	memset(&hash_ctl, 0, sizeof(hash_ctl));
 	hash_ctl.keysize   = sizeof(TableSizeEntryKey);
 	hash_ctl.entrysize = sizeof(TableSizeEntry);
-	table_size_map     = DiskquotaShmemInitHash(str.data, INIT_NUM_TABLE_SIZE_ENTRIES, MAX_NUM_TABLE_SIZE_ENTRIES,
-	                                            &hash_ctl, HASH_ELEM, DISKQUOTA_TAG_HASH);
+	table_size_map = DiskquotaShmemInitHash(str.data, MAX_NUM_TABLE_SIZE_ENTRIES, MAX_NUM_TABLE_SIZE_ENTRIES, &hash_ctl,
+	                                        HASH_ELEM, DISKQUOTA_TAG_HASH);
 
 	/* for localrejectmap */
 	/* WARNNING: The max length of name of the map is 48 */
@@ -600,7 +600,7 @@ init_disk_quota_model(uint32 id)
 	memset(&hash_ctl, 0, sizeof(hash_ctl));
 	hash_ctl.entrysize = sizeof(QuotaInfoEntry);
 	hash_ctl.keysize   = sizeof(QuotaInfoEntryKey);
-	quota_info_map     = DiskquotaShmemInitHash(str.data, INIT_QUOTA_MAP_ENTRIES, MAX_QUOTA_MAP_ENTRIES, &hash_ctl,
+	quota_info_map     = DiskquotaShmemInitHash(str.data, MAX_QUOTA_MAP_ENTRIES, MAX_QUOTA_MAP_ENTRIES, &hash_ctl,
 	                                            HASH_ELEM, DISKQUOTA_TAG_HASH);
 
 	pfree(str.data);
@@ -635,8 +635,8 @@ vacuum_disk_quota_model(uint32 id)
 	memset(&hash_ctl, 0, sizeof(hash_ctl));
 	hash_ctl.keysize   = sizeof(TableSizeEntryKey);
 	hash_ctl.entrysize = sizeof(TableSizeEntry);
-	table_size_map     = DiskquotaShmemInitHash(str.data, INIT_NUM_TABLE_SIZE_ENTRIES, MAX_NUM_TABLE_SIZE_ENTRIES,
-	                                            &hash_ctl, HASH_ELEM, DISKQUOTA_TAG_HASH);
+	table_size_map = DiskquotaShmemInitHash(str.data, MAX_NUM_TABLE_SIZE_ENTRIES, MAX_NUM_TABLE_SIZE_ENTRIES, &hash_ctl,
+	                                        HASH_ELEM, DISKQUOTA_TAG_HASH);
 	hash_seq_init(&iter, table_size_map);
 	while ((tsentry = hash_seq_search(&iter)) != NULL)
 	{
@@ -663,7 +663,7 @@ vacuum_disk_quota_model(uint32 id)
 	memset(&hash_ctl, 0, sizeof(hash_ctl));
 	hash_ctl.entrysize = sizeof(QuotaInfoEntry);
 	hash_ctl.keysize   = sizeof(QuotaInfoEntryKey);
-	quota_info_map     = DiskquotaShmemInitHash(str.data, INIT_QUOTA_MAP_ENTRIES, MAX_QUOTA_MAP_ENTRIES, &hash_ctl,
+	quota_info_map     = DiskquotaShmemInitHash(str.data, MAX_QUOTA_MAP_ENTRIES, MAX_QUOTA_MAP_ENTRIES, &hash_ctl,
 	                                            HASH_ELEM, DISKQUOTA_TAG_HASH);
 	hash_seq_init(&iter, quota_info_map);
 	while ((qentry = hash_seq_search(&iter)) != NULL)
