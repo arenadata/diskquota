@@ -52,7 +52,7 @@ typedef struct DiskQuotaSetOFCache
 } DiskQuotaSetOFCache;
 
 HTAB *active_tables_map = NULL; // Set<DiskQuotaActiveTableFileEntry>
-TimestampTz active_tables_last_overflow_report = 0;
+time_t active_tables_last_overflow_report = 0;
 
 #define ACTIVE_TABLE_ENTER(keyPtr, foundPtr)                                                     \
 	shm_hash_enter(active_tables_map, keyPtr, foundPtr, diskquota_max_active_tables,             \
@@ -69,7 +69,7 @@ TimestampTz active_tables_last_overflow_report = 0;
  * dbid will be removed from it when droping diskquota extension
  */
 HTAB *altered_reloid_cache = NULL; // Set<Oid>
-TimestampTz altered_reloid_cache_last_overflow_report = 0;
+time_t altered_reloid_cache_last_overflow_report = 0;
 
 #define ALTERED_RELOID_CACHE_ENTER(keyPtr, foundPtr)                                                            \
 	shm_hash_enter(altered_reloid_cache, keyPtr, foundPtr, diskquota_max_active_tables,                         \
