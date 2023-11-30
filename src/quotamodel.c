@@ -204,8 +204,8 @@ static TimestampTz table_size_last_overflow_report = 0;
 static HTAB *disk_quota_reject_map       = NULL;
 static HTAB *local_disk_quota_reject_map = NULL;
 
-static time_t disk_quota_reject_last_overflow_report       = 0;
-static time_t local_disk_quota_reject_last_overflow_report = 0;
+static TimestampTz disk_quota_reject_last_overflow_report       = 0;
+static TimestampTz local_disk_quota_reject_last_overflow_report = 0;
 
 #define REJECT_MAP_ENTER(keyPtr, foundPtr)                                                 \
 	shm_hash_enter(disk_quota_reject_map, keyPtr, foundPtr, MAX_DISK_QUOTA_REJECT_ENTRIES, \

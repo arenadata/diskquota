@@ -69,7 +69,7 @@ TimestampTz active_tables_last_overflow_report = 0;
  * dbid will be removed from it when droping diskquota extension
  */
 HTAB *altered_reloid_cache = NULL; // Set<Oid>
-time_t altered_reloid_cache_last_overflow_report = 0;
+TimestampTz altered_reloid_cache_last_overflow_report = 0;
 
 #define ALTERED_RELOID_CACHE_ENTER(keyPtr, foundPtr)                                                            \
 	shm_hash_enter(altered_reloid_cache, keyPtr, foundPtr, diskquota_max_active_tables,                         \

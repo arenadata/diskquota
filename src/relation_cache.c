@@ -32,7 +32,7 @@
 HTAB *relation_cache = NULL;
 HTAB *relid_cache    = NULL;
 
-extern time_t active_tables_last_overflow_report;
+extern TimestampTz active_tables_last_overflow_report;
 
 #define RELATION_CACHE_ENTER(keyPtr, foundPtr)                                                            \
 	shm_hash_enter(relation_cache, keyPtr, foundPtr, diskquota_max_active_tables,                         \
