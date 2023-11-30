@@ -52,7 +52,7 @@ typedef struct DiskQuotaSetOFCache
 } DiskQuotaSetOFCache;
 
 HTAB *active_tables_map = NULL; // Set<DiskQuotaActiveTableFileEntry>
-time_t active_tables_last_overflow_report = 0;
+TimestampTz active_tables_last_overflow_report = 0;
 
 #define ACTIVE_TABLE_ENTER(keyPtr, foundPtr)                                                     \
 	shm_hash_enter(active_tables_map, keyPtr, foundPtr, diskquota_max_active_tables,             \

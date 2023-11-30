@@ -1691,19 +1691,22 @@ void *
 shm_hash_enter(HTAB *hashp, const void *keyPtr, bool *foundPtr, int max_size, const char *warning_message,
                TimestampTz *last_overflow_report, int guc_value)
 {
+	void       *result;
+	TimestampTz current_time;
+
+	if (hash_get_num_entries(hashp) >= max_size) return hash_search(hashp, keyPtr, HASH_FIND, foundPtr);
+
+	result = hash_search(hashp, keyPtr, HASH_ENTER, foundPtr);
+
 	if (hash_get_num_entries(hashp) >= max_size)
 	{
-		return hash_search(hashp, keyPtr, HASH_FIND, foundPtr);
-	}
-	void *result = hash_search(hashp, keyPtr, HASH_ENTER, foundPtr);
-
-	TimestampTz current_time = GetCurrentTimestamp();
-	if (hash_get_num_entries(hashp) >= max_size &&
-	    TimestampDifferenceExceeds(*last_overflow_report, current_time,
-	                               diskquota_hashmap_overflow_report_timeout * 1000))
-	{
-		ereport(WARNING, (errmsg(warning_message, guc_value)));
-		*last_overflow_report = current_time;
+		current_time = GetCurrentTimestamp();
+		if (TimestampDifferenceExceeds(*last_overflow_report, current_time,
+		                               diskquota_hashmap_overflow_report_timeout * 1000))
+		{
+			ereport(WARNING, (errmsg(warning_message, guc_value)));
+			*last_overflow_report = current_time;
+		}
 	}
 	return result;
 }
