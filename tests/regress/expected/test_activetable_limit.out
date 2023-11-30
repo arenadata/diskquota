@@ -31,10 +31,10 @@ SELECT diskquota.wait_for_worker_new_epoch();
 CREATE TABLE s.t1(i int) DISTRIBUTED BY (i); -- activetable = 3
 CREATE TABLE s.t2(i int) DISTRIBUTED BY (i); -- activetable = 4
 CREATE TABLE s.t3(i int) DISTRIBUTED BY (i); -- activetable = 5. expected warning.
+CREATE TABLE s.t4(i int) DISTRIBUTED BY (i);
 WARNING:  [diskquota] the number of active tables reached the limit, please increase the GUC value for diskquota.max_active_tables. Current diskquota.max_active_tables value: 5  (seg0 127.0.1.1:6002 pid=995937)
 WARNING:  [diskquota] the number of active tables reached the limit, please increase the GUC value for diskquota.max_active_tables. Current diskquota.max_active_tables value: 5  (seg2 127.0.1.1:6004 pid=995938)
 WARNING:  [diskquota] the number of active tables reached the limit, please increase the GUC value for diskquota.max_active_tables. Current diskquota.max_active_tables value: 5  (seg1 127.0.1.1:6003 pid=995939)
-CREATE TABLE s.t4(i int) DISTRIBUTED BY (i);
 INSERT INTO s.t4 SELECT generate_series(1, 100000);
 SELECT diskquota.wait_for_worker_new_epoch();
  wait_for_worker_new_epoch 
