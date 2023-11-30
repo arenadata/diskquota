@@ -39,14 +39,14 @@ extern time_t active_tables_last_overflow_report;
 	               "[diskquota] the number of relation cache entries reached the limit, please increase " \
 	               "the GUC value for diskquota.max_active_tables. Current "                              \
 	               "diskquota.max_active_tables value: %d",                                               \
-	               &active_tables_last_overflow_report)
+	               &active_tables_last_overflow_report, diskquota_max_active_tables)
 
 #define RELID_CACHE_ENTER(keyPtr, foundPtr)                                                            \
 	shm_hash_enter(relid_cache, keyPtr, foundPtr, diskquota_max_active_tables,                         \
 	               "[diskquota] the number of relid cache entries reached the limit, please increase " \
 	               "the GUC value for diskquota.max_active_tables. Current "                           \
 	               "diskquota.max_active_tables value: %d",                                            \
-	               &active_tables_last_overflow_report)
+	               &active_tables_last_overflow_report, diskquota_max_active_tables)
 
 static void update_relation_entry(Oid relid, DiskQuotaRelationCacheEntry *relation_entry,
                                   DiskQuotaRelidCacheEntry *relid_entry);

@@ -318,5 +318,5 @@ extern HTAB *DiskquotaShmemInitHash(const char *name, long init_size, long max_s
                                     DiskquotaHashFunction hash_function);
 extern void  refresh_monitored_dbid_cache(void);
 extern void *shm_hash_enter(HTAB *hashp, const void *keyPtr, bool *foundPtr, int max_size, const char *warning_message,
-                            TimestampTz *last_overflow_report);
+                            TimestampTz *last_overflow_report, int guc_value);
 #endif

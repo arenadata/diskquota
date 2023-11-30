@@ -59,7 +59,7 @@ time_t active_tables_last_overflow_report = 0;
 	               "[diskquota] the number of active tables reached the limit, please increase " \
 	               "the GUC value for diskquota.max_active_tables. Current "                     \
 	               "diskquota.max_active_tables value: %d",                                      \
-	               &active_tables_last_overflow_report)
+	               &active_tables_last_overflow_report, diskquota_max_active_tables)
 
 /*
  * monitored_dbid_cache is a allow list for diskquota
@@ -76,7 +76,7 @@ time_t altered_reloid_cache_last_overflow_report = 0;
 	               "[diskquota] the number of altered reloid cache entries reached the limit, please increase " \
 	               "the GUC value for diskquota.max_active_tables. Current "                                    \
 	               "diskquota.max_active_tables value: %d",                                                     \
-	               &altered_reloid_cache_last_overflow_report)
+	               &altered_reloid_cache_last_overflow_report, diskquota_max_active_tables)
 
 /* active table hooks which detect the disk file size change. */
 static file_create_hook_type   prev_file_create_hook   = NULL;

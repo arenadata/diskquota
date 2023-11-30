@@ -1689,7 +1689,7 @@ DiskquotaShmemInitHash(const char           *name,       /* table string name fo
 // diskquota_hashmap_overflow_report_timeout. The time of the last warning is passed in last_overflow_report.
 void *
 shm_hash_enter(HTAB *hashp, const void *keyPtr, bool *foundPtr, int max_size, const char *warning_message,
-               TimestampTz *last_overflow_report)
+               TimestampTz *last_overflow_report, int guc_value)
 {
 	if (hash_get_num_entries(hashp) >= max_size)
 	{
@@ -1702,7 +1702,7 @@ shm_hash_enter(HTAB *hashp, const void *keyPtr, bool *foundPtr, int max_size, co
 	    TimestampDifferenceExceeds(*last_overflow_report, current_time,
 	                               diskquota_hashmap_overflow_report_timeout * 1000))
 	{
-		ereport(WARNING, (errmsg(warning_message, max_size)));
+		ereport(WARNING, (errmsg(warning_message, guc_value)));
 		*last_overflow_report = current_time;
 	}
 	return result;
