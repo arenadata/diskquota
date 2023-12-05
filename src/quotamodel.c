@@ -83,10 +83,10 @@ typedef struct RejectMapEntry       RejectMapEntry;
 typedef struct GlobalRejectMapEntry GlobalRejectMapEntry;
 typedef struct LocalRejectMapEntry  LocalRejectMapEntry;
 
-int                      SEGCOUNT = 0;
-extern int               diskquota_max_table_segments;
-extern int               diskquota_max_monitored_databases;
-extern int               diskquota_max_quota_probes;
+int        SEGCOUNT = 0;
+extern int diskquota_max_table_segments;
+extern int diskquota_max_monitored_databases;
+extern int diskquota_max_quota_probes;
 
 /*
  * local cache of table disk size and corresponding schema and owner.
@@ -142,7 +142,7 @@ typedef enum
 uint16 quota_key_num[NUM_QUOTA_TYPES]                            = {1, 1, 2, 2, 1};
 Oid    quota_key_caches[NUM_QUOTA_TYPES][MAX_NUM_KEYS_QUOTA_MAP] = {
         {NAMESPACEOID}, {AUTHOID}, {NAMESPACEOID, TABLESPACEOID}, {AUTHOID, TABLESPACEOID}, {TABLESPACEOID}};
-HTAB *quota_info_map;
+HTAB       *quota_info_map;
 TimestampTz quota_info_map_last_overflow_report = 0;
 
 #define QUOTA_INFO_ENTER(keyPtr, foundPtr)                                            \
@@ -190,7 +190,7 @@ struct LocalRejectMapEntry
 };
 
 /* using hash table to support incremental update the table size entry.*/
-static HTAB *table_size_map = NULL;
+static HTAB       *table_size_map                  = NULL;
 static TimestampTz table_size_last_overflow_report = 0;
 
 #define TABLE_SIZE_ENTER(keyPtr, foundPtr)                                                \
