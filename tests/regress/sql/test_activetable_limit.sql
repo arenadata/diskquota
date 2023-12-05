@@ -1,6 +1,6 @@
 -- table in 'diskquota not enabled database' should not be activetable
 \! gpconfig -c diskquota.max_active_tables -v 5 > /dev/null
-\! gpconfig -c diskquota.naptime -v 2 > /dev/null
+\! gpconfig -c diskquota.naptime -v 1 > /dev/null
 \! gpstop -arf > /dev/null
 
 \c
@@ -25,17 +25,16 @@ SELECT diskquota.set_schema_quota('s', '1 MB');
 
 SELECT diskquota.wait_for_worker_new_epoch();
 
--- the other two active tables are in a different database
-CREATE TABLE s.t1(i int) DISTRIBUTED BY (i); -- activetable = 3
-CREATE TABLE s.t2(i int) DISTRIBUTED BY (i); -- activetable = 4
-CREATE TABLE s.t3(i int) DISTRIBUTED BY (i); -- activetable = 5. expected warning.
-CREATE TABLE s.t4(i int) DISTRIBUTED BY (i);
+-- We create twice as many tables as the limit to ensure that the active_tables table is overflow.
+CREATE TABLE s.t1 (a int, b int) DISTRIBUTED BY (a)
+    PARTITION BY RANGE (b) ( START (0) END (10) EVERY (1) );
+CREATE TABLE s.t2(i int) DISTRIBUTED BY (i);
 
-INSERT INTO s.t4 SELECT generate_series(1, 100000);
+INSERT INTO s.t2 SELECT generate_series(1, 100000);
 
 SELECT diskquota.wait_for_worker_new_epoch();
 
-INSERT INTO s.t1 SELECT generate_series(1, 10); -- should be successful
+INSERT INTO s.t1 SELECT a, a from generate_series(0, 9)a; -- should be successful
 select count(*) from s.t1;
 
 -- altered reloid cache overflow check. expected warning.
