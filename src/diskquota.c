@@ -70,14 +70,14 @@ static volatile sig_atomic_t got_sigusr1 = false;
 static volatile sig_atomic_t got_sigusr2 = false;
 
 /* GUC variables */
-int  diskquota_naptime                 = 0;
-int  diskquota_max_active_tables       = 0;
-int  diskquota_worker_timeout          = 60; /* default timeout is 60 seconds */
-bool diskquota_hardlimit               = false;
-int  diskquota_max_workers             = 10;
-int  diskquota_max_table_segments      = 0;
-int  diskquota_max_monitored_databases = 0;
-int  diskquota_max_quota_probes        = 0;
+int  diskquota_naptime                         = 0;
+int  diskquota_max_active_tables               = 0;
+int  diskquota_worker_timeout                  = 60; /* default timeout is 60 seconds */
+bool diskquota_hardlimit                       = false;
+int  diskquota_max_workers                     = 10;
+int  diskquota_max_table_segments              = 0;
+int  diskquota_max_monitored_databases         = 0;
+int  diskquota_max_quota_probes                = 0;
 int  diskquota_hashmap_overflow_report_timeout = 0;
 
 DiskQuotaLocks       diskquota_locks;
