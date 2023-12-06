@@ -410,9 +410,9 @@ define_guc_variables(void)
 	                        &diskquota_max_quota_probes, 1024 * 1024, 1024 * INIT_QUOTA_MAP_ENTRIES, INT_MAX,
 	                        PGC_POSTMASTER, 0, NULL, NULL, NULL);
 	DefineCustomIntVariable("diskquota.hashmap_overflow_report_timeout",
-	                        "Time interval in seconds between shared hash map overflow report.", NULL,
-	                        &diskquota_hashmap_overflow_report_timeout, 60, 0, INT_MAX / 1000, PGC_SUSET, 0, NULL, NULL,
-	                        NULL);
+	                        "The duration between each warning report about the shared hashmap overflow (in seconds).",
+	                        NULL, &diskquota_hashmap_overflow_report_timeout, 60, 0, INT_MAX / 1000, PGC_SUSET, 0, NULL,
+	                        NULL, NULL);
 }
 
 /* ---- Functions for disk quota worker process ---- */

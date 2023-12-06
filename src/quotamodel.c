@@ -209,9 +209,8 @@ static TimestampTz local_disk_quota_reject_last_overflow_report = 0;
 
 #define REJECT_MAP_ENTER(keyPtr, foundPtr)                                                 \
 	shm_hash_enter(disk_quota_reject_map, keyPtr, foundPtr, MAX_DISK_QUOTA_REJECT_ENTRIES, \
-	               "[diskquota] Shared disk quota reject map size limit reached (%d)."     \
-	               "Some out-of-limit schemas or roles will be lost"                       \
-	               "in rejectmap.",                                                        \
+	               "[diskquota] Shared disk quota reject map size limit reached (%d). "    \
+	               "Some out-of-limit schemas or roles will be lost in rejectmap.",        \
 	               &disk_quota_reject_last_overflow_report, MAX_DISK_QUOTA_REJECT_ENTRIES)
 
 #define LOCAL_REJECT_MAP_ENTER(keyPtr, foundPtr)                                                 \
