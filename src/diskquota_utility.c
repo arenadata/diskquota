@@ -1684,14 +1684,14 @@ DiskquotaShmemInitHash(const char           *name,       /* table string name fo
 #endif /* GP_VERSION_NUM */
 }
 
-// Add or find an entry in a hash table with a size limit. If the limit is reached, only the search will be performed.
-// When overflowing, the warning warning_message will be report. But not more often than specified in
-// diskquota_hashmap_overflow_report_timeout. The time of the last warning is passed in last_overflow_report.
-void *
-shm_hash_enter(HTAB *hashp, const void *keyPtr, bool *foundPtr, int max_size, const char *warning_message,
-               TimestampTz *last_overflow_report, int guc_value)
+/*
+ * Returns HASH_FIND if hash table is full and HASH_ENTER otherwise.
+ */
+HASHACTION
+check_hash_fullness(HTAB *hashp, int max_size, const char *warning_message, TimestampTz *last_overflow_report,
+                    int guc_value)
 {
-	if (hash_get_num_entries(hashp) < max_size) return hash_search(hashp, keyPtr, HASH_ENTER, foundPtr);
+	if (hash_get_num_entries(hashp) < max_size) return HASH_ENTER;
 
 	if (hash_get_num_entries(hashp) == max_size)
 	{
@@ -1703,5 +1703,5 @@ shm_hash_enter(HTAB *hashp, const void *keyPtr, bool *foundPtr, int max_size, co
 			*last_overflow_report = current_time;
 		}
 	}
-	return hash_search(hashp, keyPtr, HASH_FIND, foundPtr);
+	return HASH_FIND;
 }

@@ -54,12 +54,10 @@ typedef struct DiskQuotaSetOFCache
 HTAB       *active_tables_map                  = NULL; // Set<DiskQuotaActiveTableFileEntry>
 TimestampTz active_tables_last_overflow_report = 0;
 
-#define ACTIVE_TABLE_ENTER(keyPtr, foundPtr)                                                     \
-	shm_hash_enter(active_tables_map, keyPtr, foundPtr, diskquota_max_active_tables,             \
-	               "[diskquota] the number of active tables reached the limit, please increase " \
-	               "the GUC value for diskquota.max_active_tables. Current "                     \
-	               "diskquota.max_active_tables value: %d",                                      \
-	               &active_tables_last_overflow_report, diskquota_max_active_tables)
+#define ACTIVE_TABLE_WARNING                                                      \
+	"[diskquota] the number of active tables reached the limit, please increase " \
+	"the GUC value for diskquota.max_active_tables. Current "                     \
+	"diskquota.max_active_tables value: %d"
 
 /*
  * monitored_dbid_cache is a allow list for diskquota
@@ -71,12 +69,10 @@ TimestampTz active_tables_last_overflow_report = 0;
 HTAB       *altered_reloid_cache                      = NULL; // Set<Oid>
 TimestampTz altered_reloid_cache_last_overflow_report = 0;
 
-#define ALTERED_RELOID_CACHE_ENTER(keyPtr, foundPtr)                                                            \
-	shm_hash_enter(altered_reloid_cache, keyPtr, foundPtr, diskquota_max_active_tables,                         \
-	               "[diskquota] the number of altered reloid cache entries reached the limit, please increase " \
-	               "the GUC value for diskquota.max_active_tables. Current "                                    \
-	               "diskquota.max_active_tables value: %d",                                                     \
-	               &altered_reloid_cache_last_overflow_report, diskquota_max_active_tables)
+#define ALTERED_RELOID_CACHE_WARNING                                                             \
+	"[diskquota] the number of altered reloid cache entries reached the limit, please increase " \
+	"the GUC value for diskquota.max_active_tables. Current "                                    \
+	"diskquota.max_active_tables value: %d"
 
 /* active table hooks which detect the disk file size change. */
 static file_create_hook_type   prev_file_create_hook   = NULL;
@@ -252,7 +248,10 @@ report_altered_reloid(Oid reloid)
 	if (IsRoleMirror() || IS_QUERY_DISPATCHER()) return;
 
 	LWLockAcquire(diskquota_locks.altered_reloid_cache_lock, LW_EXCLUSIVE);
-	ALTERED_RELOID_CACHE_ENTER(&reloid, NULL);
+	HASHACTION action =
+	        check_hash_fullness(altered_reloid_cache, diskquota_max_active_tables, ALTERED_RELOID_CACHE_WARNING,
+	                            &altered_reloid_cache_last_overflow_report, diskquota_max_active_tables);
+	hash_search(altered_reloid_cache, &reloid, action, NULL);
 	LWLockRelease(diskquota_locks.altered_reloid_cache_lock);
 }
 
@@ -334,7 +333,9 @@ report_active_table_helper(const RelFileNodeBackend *relFileNode)
 	item.tablespaceoid = relFileNode->node.spcNode;
 
 	LWLockAcquire(diskquota_locks.active_table_lock, LW_EXCLUSIVE);
-	entry = ACTIVE_TABLE_ENTER(&item, &found);
+	HASHACTION action = check_hash_fullness(active_tables_map, diskquota_max_active_tables, ACTIVE_TABLE_WARNING,
+	                                        &active_tables_last_overflow_report, diskquota_max_active_tables);
+	entry             = hash_search(active_tables_map, &item, action, &found);
 	if (entry && !found) *entry = item;
 
 	LWLockRelease(diskquota_locks.active_table_lock);
@@ -865,7 +866,9 @@ get_active_tables_oid(void)
 	while ((active_table_file_entry = (DiskQuotaActiveTableFileEntry *)hash_seq_search(&iter)) != NULL)
 	{
 		/* TODO: handle possible ERROR here so that the bgworker will not go down. */
-		ACTIVE_TABLE_ENTER(active_table_file_entry, NULL);
+		HASHACTION action = check_hash_fullness(active_tables_map, diskquota_max_active_tables, ACTIVE_TABLE_WARNING,
+		                                        &active_tables_last_overflow_report, diskquota_max_active_tables);
+		hash_search(active_tables_map, active_table_file_entry, action, NULL);
 	}
 	/* TODO: hash_seq_term(&iter); */
 	LWLockRelease(diskquota_locks.active_table_lock);
@@ -927,7 +930,10 @@ get_active_tables_oid(void)
 		LWLockAcquire(diskquota_locks.active_table_lock, LW_EXCLUSIVE);
 		while ((active_table_file_entry = (DiskQuotaActiveTableFileEntry *)hash_seq_search(&iter)) != NULL)
 		{
-			entry = ACTIVE_TABLE_ENTER(active_table_file_entry, &found);
+			HASHACTION action =
+			        check_hash_fullness(active_tables_map, diskquota_max_active_tables, ACTIVE_TABLE_WARNING,
+			                            &active_tables_last_overflow_report, diskquota_max_active_tables);
+			entry = hash_search(active_tables_map, active_table_file_entry, action, &found);
 			if (entry) *entry = *active_table_file_entry;
 		}
 		LWLockRelease(diskquota_locks.active_table_lock);
