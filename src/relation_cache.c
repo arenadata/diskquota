@@ -37,12 +37,12 @@ extern TimestampTz active_tables_last_overflow_report;
 #define RELATION_CACHE_WARNING                                                             \
 	"[diskquota] the number of relation cache entries reached the limit, please increase " \
 	"the GUC value for diskquota.max_active_tables. Current "                              \
-	"diskquota.max_active_tables value: %d"
+	"diskquota.max_active_tables value:"
 
 #define RELID_CACHE_WARNING                                                                \
 	"[diskquota] the number of relation cache entries reached the limit, please increase " \
 	"the GUC value for diskquota.max_active_tables. Current "                              \
-	"diskquota.max_active_tables value: %d"
+	"diskquota.max_active_tables value:"
 
 static void update_relation_entry(Oid relid, DiskQuotaRelationCacheEntry *relation_entry,
                                   DiskQuotaRelidCacheEntry *relid_entry);

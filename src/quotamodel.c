@@ -148,7 +148,7 @@ TimestampTz quota_info_map_last_overflow_report = 0;
 #define QUOTA_INFO_WARNING                                             \
 	"[diskquota] the number of quota probe reached the limit, please " \
 	"increase the GUC value for diskquota.max_quota_probes. Current "  \
-	"diskquota.max_quota_probes value: %d"
+	"diskquota.max_quota_probes value:"
 
 /* global rejectmap for which exceed their quota limit */
 struct RejectMapEntry
@@ -194,7 +194,7 @@ static TimestampTz table_size_last_overflow_report = 0;
 #define TABLE_SIZE_WARNING                                                 \
 	"[diskquota] the number of tables reached the limit, please increase " \
 	"the GUC value for diskquota.max_table_segments. Current "             \
-	"diskquota.max_table_segments value: %d"
+	"diskquota.max_table_segments value:"
 
 /* rejectmap for database objects which exceed their quota limit */
 static HTAB *disk_quota_reject_map       = NULL;
@@ -203,11 +203,11 @@ static HTAB *local_disk_quota_reject_map = NULL;
 static TimestampTz disk_quota_reject_last_overflow_report       = 0;
 static TimestampTz local_disk_quota_reject_last_overflow_report = 0;
 
-#define REJECT_MAP_WARNING                                               \
-	"[diskquota] Shared disk quota reject map size limit reached (%d). " \
-	"Some out-of-limit schemas or roles will be lost in rejectmap."
+#define REJECT_MAP_WARNING                                          \
+	"[diskquota] Shared disk quota reject map size limit reached. " \
+	"Some out-of-limit schemas or roles will be lost in rejectmap. Current limit:"
 
-#define LOCAL_REJECT_MAP_WARNING "[diskquota] the number of local reject map entries reached the limit (%d)"
+#define LOCAL_REJECT_MAP_WARNING "[diskquota] the number of local reject map entries reached the limit:"
 
 static shmem_startup_hook_type prev_shmem_startup_hook = NULL;
 

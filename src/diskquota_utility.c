@@ -1686,20 +1686,23 @@ DiskquotaShmemInitHash(const char           *name,       /* table string name fo
 
 /*
  * Returns HASH_FIND if hash table is full and HASH_ENTER otherwise.
+ * It can be used only under lock.
  */
 HASHACTION
 check_hash_fullness(HTAB *hashp, int max_size, const char *warning_message, TimestampTz *last_overflow_report,
                     int guc_value)
 {
-	if (hash_get_num_entries(hashp) < max_size) return HASH_ENTER;
+	long num_entries = hash_get_num_entries(hashp);
 
-	if (hash_get_num_entries(hashp) == max_size)
+	if (num_entries < max_size) return HASH_ENTER;
+
+	if (num_entries == max_size)
 	{
 		TimestampTz current_time = GetCurrentTimestamp();
 		if (TimestampDifferenceExceeds(*last_overflow_report, current_time,
 		                               diskquota_hashmap_overflow_report_timeout * 1000))
 		{
-			ereport(WARNING, (errmsg(warning_message, guc_value)));
+			ereport(WARNING, (errmsg("%s %d", warning_message, guc_value)));
 			*last_overflow_report = current_time;
 		}
 	}

@@ -57,7 +57,7 @@ TimestampTz active_tables_last_overflow_report = 0;
 #define ACTIVE_TABLE_WARNING                                                      \
 	"[diskquota] the number of active tables reached the limit, please increase " \
 	"the GUC value for diskquota.max_active_tables. Current "                     \
-	"diskquota.max_active_tables value: %d"
+	"diskquota.max_active_tables value:"
 
 /*
  * monitored_dbid_cache is a allow list for diskquota
@@ -72,7 +72,7 @@ TimestampTz altered_reloid_cache_last_overflow_report = 0;
 #define ALTERED_RELOID_CACHE_WARNING                                                             \
 	"[diskquota] the number of altered reloid cache entries reached the limit, please increase " \
 	"the GUC value for diskquota.max_active_tables. Current "                                    \
-	"diskquota.max_active_tables value: %d"
+	"diskquota.max_active_tables value:"
 
 /* active table hooks which detect the disk file size change. */
 static file_create_hook_type   prev_file_create_hook   = NULL;
@@ -865,7 +865,6 @@ get_active_tables_oid(void)
 	hash_seq_init(&iter, local_active_table_file_map);
 	while ((active_table_file_entry = (DiskQuotaActiveTableFileEntry *)hash_seq_search(&iter)) != NULL)
 	{
-		/* TODO: handle possible ERROR here so that the bgworker will not go down. */
 		HASHACTION action = check_hash_fullness(active_tables_map, diskquota_max_active_tables, ACTIVE_TABLE_WARNING,
 		                                        &active_tables_last_overflow_report, diskquota_max_active_tables);
 		hash_search(active_tables_map, active_table_file_entry, action, NULL);
