@@ -1699,6 +1699,7 @@ check_hash_fullness(HTAB *hashp, int max_size, const char *warning_message, Time
 	if (num_entries == max_size)
 	{
 		TimestampTz current_time = GetCurrentTimestamp();
+
 		if (TimestampDifferenceExceeds(*last_overflow_report, current_time,
 		                               diskquota_hashmap_overflow_report_timeout * 1000))
 		{
@@ -1706,5 +1707,6 @@ check_hash_fullness(HTAB *hashp, int max_size, const char *warning_message, Time
 			*last_overflow_report = current_time;
 		}
 	}
+
 	return HASH_FIND;
 }

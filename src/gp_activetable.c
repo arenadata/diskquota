@@ -54,7 +54,7 @@ typedef struct DiskQuotaSetOFCache
 HTAB       *active_tables_map                  = NULL; // Set<DiskQuotaActiveTableFileEntry>
 TimestampTz active_tables_last_overflow_report = 0;
 
-#define ACTIVE_TABLE_WARNING                                                      \
+#define ACTIVE_TABLES_MAP_WARNING                                                 \
 	"[diskquota] the number of active tables reached the limit, please increase " \
 	"the GUC value for diskquota.max_active_tables. Current "                     \
 	"diskquota.max_active_tables value:"
@@ -333,7 +333,7 @@ report_active_table_helper(const RelFileNodeBackend *relFileNode)
 	item.tablespaceoid = relFileNode->node.spcNode;
 
 	LWLockAcquire(diskquota_locks.active_table_lock, LW_EXCLUSIVE);
-	HASHACTION action = check_hash_fullness(active_tables_map, diskquota_max_active_tables, ACTIVE_TABLE_WARNING,
+	HASHACTION action = check_hash_fullness(active_tables_map, diskquota_max_active_tables, ACTIVE_TABLES_MAP_WARNING,
 	                                        &active_tables_last_overflow_report, diskquota_max_active_tables);
 	entry             = hash_search(active_tables_map, &item, action, &found);
 	if (entry && !found) *entry = item;
@@ -865,8 +865,9 @@ get_active_tables_oid(void)
 	hash_seq_init(&iter, local_active_table_file_map);
 	while ((active_table_file_entry = (DiskQuotaActiveTableFileEntry *)hash_seq_search(&iter)) != NULL)
 	{
-		HASHACTION action = check_hash_fullness(active_tables_map, diskquota_max_active_tables, ACTIVE_TABLE_WARNING,
-		                                        &active_tables_last_overflow_report, diskquota_max_active_tables);
+		HASHACTION action =
+		        check_hash_fullness(active_tables_map, diskquota_max_active_tables, ACTIVE_TABLES_MAP_WARNING,
+		                            &active_tables_last_overflow_report, diskquota_max_active_tables);
 		hash_search(active_tables_map, active_table_file_entry, action, NULL);
 	}
 	/* TODO: hash_seq_term(&iter); */
@@ -930,7 +931,7 @@ get_active_tables_oid(void)
 		while ((active_table_file_entry = (DiskQuotaActiveTableFileEntry *)hash_seq_search(&iter)) != NULL)
 		{
 			HASHACTION action =
-			        check_hash_fullness(active_tables_map, diskquota_max_active_tables, ACTIVE_TABLE_WARNING,
+			        check_hash_fullness(active_tables_map, diskquota_max_active_tables, ACTIVE_TABLES_MAP_WARNING,
 			                            &active_tables_last_overflow_report, diskquota_max_active_tables);
 			entry = hash_search(active_tables_map, active_table_file_entry, action, &found);
 			if (entry) *entry = *active_table_file_entry;
