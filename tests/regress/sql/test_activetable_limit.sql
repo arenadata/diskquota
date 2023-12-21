@@ -20,6 +20,11 @@ INSERT INTO a03 values(generate_series(0, 500));
 
 \c test_tablenum_limit_02
 CREATE EXTENSION diskquota;
+
+CREATE EXTERNAL WEB TABLE segment_logs(line text)
+    EXECUTE 'cat $GP_SEG_DATADIR/pg_log/$(ls -Art $GP_SEG_DATADIR/pg_log | tail -n 1)'
+    ON ALL FORMAT 'TEXT' (DELIMITER 'OFF');
+
 CREATE SCHEMA s;
 SELECT diskquota.set_schema_quota('s', '1 MB');
 
@@ -28,17 +33,21 @@ SELECT diskquota.wait_for_worker_new_epoch();
 -- We create twice as many tables as the limit to ensure that the active_tables table is overflow.
 CREATE TABLE s.t1 (a int, b int) DISTRIBUTED BY (a)
     PARTITION BY RANGE (b) ( START (0) END (10) EVERY (1) );
-CREATE TABLE s.t2(i int) DISTRIBUTED BY (i);
 
+SELECT count(*) FROM segment_logs WHERE line LIKE '%the number of active tables reached the limit%';
+
+CREATE TABLE s.t2(i int) DISTRIBUTED BY (i);
 INSERT INTO s.t2 SELECT generate_series(1, 100000);
 
 SELECT diskquota.wait_for_worker_new_epoch();
 
 INSERT INTO s.t1 SELECT a, a from generate_series(0, 9)a; -- should be successful
-select count(*) from s.t1;
+SELECT count(*) FROM s.t1;
 
 -- altered reloid cache overflow check. expected warning.
-vacuum full;
+VACUUM FULL;
+
+SELECT count(*) FROM segment_logs WHERE line LIKE '%the number of altered reloid cache entries reached the limit%';
 
 DROP EXTENSION diskquota;
 

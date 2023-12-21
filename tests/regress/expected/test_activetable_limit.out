@@ -14,6 +14,9 @@ INSERT INTO a02 values(generate_series(0, 500));
 INSERT INTO a03 values(generate_series(0, 500));
 \c test_tablenum_limit_02
 CREATE EXTENSION diskquota;
+CREATE EXTERNAL WEB TABLE segment_logs(line text)
+    EXECUTE 'cat $GP_SEG_DATADIR/pg_log/$(ls -Art $GP_SEG_DATADIR/pg_log | tail -n 1)'
+    ON ALL FORMAT 'TEXT' (DELIMITER 'OFF');
 CREATE SCHEMA s;
 SELECT diskquota.set_schema_quota('s', '1 MB');
  set_schema_quota 
@@ -41,9 +44,15 @@ NOTICE:  CREATE TABLE will create partition "t1_1_prt_8" for table "t1"
 NOTICE:  CREATE TABLE will create partition "t1_1_prt_9" for table "t1"
 NOTICE:  CREATE TABLE will create partition "t1_1_prt_10" for table "t1"
 WARNING:  [diskquota] the number of active tables reached the limit, please increase the GUC value for diskquota.max_active_tables. Current diskquota.max_active_tables value: 5
-WARNING:  [diskquota] the number of active tables reached the limit, please increase the GUC value for diskquota.max_active_tables. Current diskquota.max_active_tables value: 5  (seg0 127.0.1.1:6002 pid=281310)
-WARNING:  [diskquota] the number of active tables reached the limit, please increase the GUC value for diskquota.max_active_tables. Current diskquota.max_active_tables value: 5  (seg1 127.0.1.1:6003 pid=281312)
-WARNING:  [diskquota] the number of active tables reached the limit, please increase the GUC value for diskquota.max_active_tables. Current diskquota.max_active_tables value: 5  (seg2 127.0.1.1:6004 pid=281311)
+WARNING:  [diskquota] the number of active tables reached the limit, please increase the GUC value for diskquota.max_active_tables. Current diskquota.max_active_tables value: 5  (seg0 127.0.1.1:6002 pid=195302)
+WARNING:  [diskquota] the number of active tables reached the limit, please increase the GUC value for diskquota.max_active_tables. Current diskquota.max_active_tables value: 5  (seg1 127.0.1.1:6003 pid=195303)
+WARNING:  [diskquota] the number of active tables reached the limit, please increase the GUC value for diskquota.max_active_tables. Current diskquota.max_active_tables value: 5  (seg2 127.0.1.1:6004 pid=195304)
+SELECT count(*) FROM segment_logs WHERE line LIKE '%the number of active tables reached the limit%';
+ count 
+-------
+     3
+(1 row)
+
 CREATE TABLE s.t2(i int) DISTRIBUTED BY (i);
 INSERT INTO s.t2 SELECT generate_series(1, 100000);
 SELECT diskquota.wait_for_worker_new_epoch();
@@ -53,17 +62,23 @@ SELECT diskquota.wait_for_worker_new_epoch();
 (1 row)
 
 INSERT INTO s.t1 SELECT a, a from generate_series(0, 9)a; -- should be successful
-select count(*) from s.t1;
+SELECT count(*) FROM s.t1;
  count 
 -------
     10
 (1 row)
 
 -- altered reloid cache overflow check. expected warning.
-vacuum full;
-WARNING:  [diskquota] the number of altered reloid cache entries reached the limit, please increase the GUC value for diskquota.max_active_tables. Current diskquota.max_active_tables value: 5  (seg0 127.0.1.1:6002 pid=281310)
-WARNING:  [diskquota] the number of altered reloid cache entries reached the limit, please increase the GUC value for diskquota.max_active_tables. Current diskquota.max_active_tables value: 5  (seg1 127.0.1.1:6003 pid=281312)
-WARNING:  [diskquota] the number of altered reloid cache entries reached the limit, please increase the GUC value for diskquota.max_active_tables. Current diskquota.max_active_tables value: 5  (seg2 127.0.1.1:6004 pid=281311)
+VACUUM FULL;
+WARNING:  [diskquota] the number of altered reloid cache entries reached the limit, please increase the GUC value for diskquota.max_active_tables. Current diskquota.max_active_tables value: 5  (seg2 127.0.1.1:6004 pid=195304)
+WARNING:  [diskquota] the number of altered reloid cache entries reached the limit, please increase the GUC value for diskquota.max_active_tables. Current diskquota.max_active_tables value: 5  (seg0 127.0.1.1:6002 pid=195302)
+WARNING:  [diskquota] the number of altered reloid cache entries reached the limit, please increase the GUC value for diskquota.max_active_tables. Current diskquota.max_active_tables value: 5  (seg1 127.0.1.1:6003 pid=195303)
+SELECT count(*) FROM segment_logs WHERE line LIKE '%the number of altered reloid cache entries reached the limit%';
+ count 
+-------
+     3
+(1 row)
+
 DROP EXTENSION diskquota;
 \c contrib_regression
 DROP DATABASE test_tablenum_limit_01;
