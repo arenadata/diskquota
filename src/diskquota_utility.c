@@ -1689,8 +1689,7 @@ DiskquotaShmemInitHash(const char           *name,       /* table string name fo
  * It can be used only under lock.
  */
 HASHACTION
-check_hash_fullness(HTAB *hashp, int max_size, const char *warning_message, TimestampTz *last_overflow_report,
-                    int guc_value)
+check_hash_fullness(HTAB *hashp, int max_size, const char *warning_message, TimestampTz *last_overflow_report)
 {
 	long num_entries = hash_get_num_entries(hashp);
 
@@ -1700,10 +1699,10 @@ check_hash_fullness(HTAB *hashp, int max_size, const char *warning_message, Time
 	{
 		TimestampTz current_time = GetCurrentTimestamp();
 
-		if (TimestampDifferenceExceeds(*last_overflow_report, current_time,
-		                               diskquota_hashmap_overflow_report_timeout * 1000))
+		if (*last_overflow_report == 0 || TimestampDifferenceExceeds(*last_overflow_report, current_time,
+		                                                             diskquota_hashmap_overflow_report_timeout * 1000))
 		{
-			ereport(WARNING, (errmsg("%s %d", warning_message, guc_value)));
+			ereport(WARNING, (errmsg(warning_message)));
 			*last_overflow_report = current_time;
 		}
 	}

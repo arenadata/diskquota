@@ -32,17 +32,15 @@
 HTAB *relation_cache = NULL;
 HTAB *relid_cache    = NULL;
 
-extern TimestampTz active_tables_last_overflow_report;
+extern TimestampTz active_tables_map_last_overflow_report;
 
 #define RELATION_CACHE_WARNING                                                             \
 	"[diskquota] the number of relation cache entries reached the limit, please increase " \
-	"the GUC value for diskquota.max_active_tables. Current "                              \
-	"diskquota.max_active_tables value:"
+	"the GUC value for diskquota.max_active_tables."
 
 #define RELID_CACHE_WARNING                                                                \
 	"[diskquota] the number of relation cache entries reached the limit, please increase " \
-	"the GUC value for diskquota.max_active_tables. Current "                              \
-	"diskquota.max_active_tables value:"
+	"the GUC value for diskquota.max_active_tables."
 
 static void update_relation_entry(Oid relid, DiskQuotaRelationCacheEntry *relation_entry,
                                   DiskQuotaRelidCacheEntry *relid_entry);
@@ -192,7 +190,7 @@ update_relation_cache(Oid relid)
 	LWLockAcquire(diskquota_locks.relation_cache_lock, LW_EXCLUSIVE);
 
 	action         = check_hash_fullness(relation_cache, diskquota_max_active_tables, RELATION_CACHE_WARNING,
-	                                     &active_tables_last_overflow_report, diskquota_max_active_tables);
+	                                     &active_tables_map_last_overflow_report);
 	relation_entry = hash_search(relation_cache, &relation_entry_data.relid, action, NULL);
 
 	if (relation_entry == NULL)
@@ -203,7 +201,7 @@ update_relation_cache(Oid relid)
 	memcpy(relation_entry, &relation_entry_data, sizeof(DiskQuotaRelationCacheEntry));
 
 	action      = check_hash_fullness(relid_cache, diskquota_max_active_tables, RELID_CACHE_WARNING,
-	                                  &active_tables_last_overflow_report, diskquota_max_active_tables);
+	                                  &active_tables_map_last_overflow_report);
 	relid_entry = hash_search(relid_cache, &relid_entry_data.relfilenode, action, NULL);
 	if (relid_entry == NULL)
 	{
