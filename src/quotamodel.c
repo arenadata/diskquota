@@ -139,6 +139,7 @@ uint16 quota_key_num[NUM_QUOTA_TYPES]                            = {1, 1, 2, 2, 
 Oid    quota_key_caches[NUM_QUOTA_TYPES][MAX_NUM_KEYS_QUOTA_MAP] = {
         {NAMESPACEOID}, {AUTHOID}, {NAMESPACEOID, TABLESPACEOID}, {AUTHOID, TABLESPACEOID}, {TABLESPACEOID}};
 static HTAB        *quota_info_map;
+/* stored in shared memory */
 static TimestampTz *quota_info_map_last_overflow_report = NULL;
 
 #define QUOTA_INFO_MAP_WARNING                                         \
@@ -184,6 +185,7 @@ struct LocalRejectMapEntry
 
 /* using hash table to support incremental update the table size entry.*/
 static HTAB        *table_size_map                      = NULL;
+/* stored in shared memory */
 static TimestampTz *table_size_map_last_overflow_report = NULL;
 
 #define TABLE_SIZE_MAP_WARNING                                             \
@@ -195,6 +197,7 @@ static HTAB *disk_quota_reject_map       = NULL;
 static HTAB *local_disk_quota_reject_map = NULL;
 
 static TimestampTz  disk_quota_reject_map_last_overflow_report       = 0;
+/* stored in shared memory */
 static TimestampTz *local_disk_quota_reject_map_last_overflow_report = NULL;
 
 #define DISK_QUOTA_REJECT_MAP_WARNING                                        \
