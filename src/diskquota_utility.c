@@ -1702,7 +1702,7 @@ check_hash_fullness(HTAB *hashp, int max_size, const char *warning_message, Time
 		if (*last_overflow_report == 0 || TimestampDifferenceExceeds(*last_overflow_report, current_time,
 		                                                             diskquota_hashmap_overflow_report_timeout * 1000))
 		{
-			ereport(WARNING, (errmsg(warning_message)));
+			ereport(WARNING, (errmsg("%s", warning_message)));
 			*last_overflow_report = current_time;
 		}
 	}
