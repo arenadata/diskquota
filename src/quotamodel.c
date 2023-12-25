@@ -184,7 +184,7 @@ struct LocalRejectMapEntry
 
 /* using hash table to support incremental update the table size entry.*/
 static HTAB        *table_size_map                      = NULL;
-static TimestampTz *table_size_map_last_overflow_report = 0;
+static TimestampTz *table_size_map_last_overflow_report = NULL;
 
 #define TABLE_SIZE_MAP_WARNING                                             \
 	"[diskquota] the number of tables reached the limit, please increase " \
