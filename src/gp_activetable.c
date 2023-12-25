@@ -928,7 +928,7 @@ get_active_tables_oid(void)
 		{
 			HASHACTION action = check_hash_fullness(active_tables_map, diskquota_max_active_tables,
 			                                        ACTIVE_TABLES_MAP_WARNING, &active_tables_map_last_overflow_report);
-			entry = hash_search(active_tables_map, active_table_file_entry, action, &found);
+			entry             = hash_search(active_tables_map, active_table_file_entry, action, &found);
 			if (entry) *entry = *active_table_file_entry;
 		}
 		LWLockRelease(diskquota_locks.active_table_lock);
