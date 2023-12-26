@@ -509,6 +509,7 @@ diskquota_worker_shmem_size()
 	size = add_size(size, hash_estimate_size(diskquota_max_local_reject_entries, sizeof(LocalRejectMapEntry)));
 	size = add_size(size, sizeof(TimestampTz)); // table_size_map_last_overflow_report
 	size = add_size(size, sizeof(TimestampTz)); // local_disk_quota_reject_map_last_overflow_report
+	size = add_size(size, sizeof(TimestampTz)); // quota_info_map_last_overflow_report
 	return size;
 }
 
@@ -535,8 +536,6 @@ DiskQuotaShmemSize(void)
 		size = add_size(size, diskquota_worker_shmem_size() * diskquota_max_monitored_databases);
 		size = add_size(size, hash_estimate_size(MAX_QUOTA_MAP_ENTRIES, sizeof(QuotaInfoEntry)) *
 		                              diskquota_max_monitored_databases);
-		size = add_size(size,
-		                sizeof(TimestampTz) * diskquota_max_monitored_databases); // quota_info_map_last_overflow_report
 	}
 
 	return size;
