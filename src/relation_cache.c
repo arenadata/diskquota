@@ -34,12 +34,12 @@ HTAB *relid_cache    = NULL;
 
 extern TimestampTz active_tables_map_last_overflow_report;
 
-#define RELATION_CACHE_WARNING                                                             \
-	"[diskquota] the number of relation cache entries reached the limit, please increase " \
+#define RELATION_CACHE_WARNING                                                 \
+	"the number of relation cache entries reached the limit, please increase " \
 	"the GUC value for diskquota.max_active_tables."
 
-#define RELID_CACHE_WARNING                                                                \
-	"[diskquota] the number of relation cache entries reached the limit, please increase " \
+#define RELID_CACHE_WARNING                                                 \
+	"the number of relid cache entries reached the limit, please increase " \
 	"the GUC value for diskquota.max_active_tables."
 
 static void update_relation_entry(Oid relid, DiskQuotaRelationCacheEntry *relation_entry,

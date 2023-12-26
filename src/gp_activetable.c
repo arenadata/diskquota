@@ -54,8 +54,8 @@ typedef struct DiskQuotaSetOFCache
 static HTAB *active_tables_map                      = NULL; // Set<DiskQuotaActiveTableFileEntry>
 TimestampTz  active_tables_map_last_overflow_report = 0;
 
-#define ACTIVE_TABLES_MAP_WARNING                                                 \
-	"[diskquota] the number of active tables reached the limit, please increase " \
+#define ACTIVE_TABLES_MAP_WARNING                                     \
+	"the number of active tables reached the limit, please increase " \
 	"the GUC value for diskquota.max_active_tables."
 
 /*
@@ -68,8 +68,8 @@ TimestampTz  active_tables_map_last_overflow_report = 0;
 static HTAB       *altered_reloid_cache                      = NULL; // Set<Oid>
 static TimestampTz altered_reloid_cache_last_overflow_report = 0;
 
-#define ALTERED_RELOID_CACHE_WARNING                                                             \
-	"[diskquota] the number of altered reloid cache entries reached the limit, please increase " \
+#define ALTERED_RELOID_CACHE_WARNING                                                 \
+	"the number of altered reloid cache entries reached the limit, please increase " \
 	"the GUC value for diskquota.max_active_tables."
 
 /* active table hooks which detect the disk file size change. */

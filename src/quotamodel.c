@@ -142,8 +142,8 @@ static HTAB *quota_info_map;
 /* stored in shared memory */
 static TimestampTz *quota_info_map_last_overflow_report = NULL;
 
-#define QUOTA_INFO_MAP_WARNING                                         \
-	"[diskquota] the number of quota probe reached the limit, please " \
+#define QUOTA_INFO_MAP_WARNING                             \
+	"the number of quota probe reached the limit, please " \
 	"increase the GUC value for diskquota.max_quota_probes."
 
 /* global rejectmap for which exceed their quota limit */
@@ -188,8 +188,8 @@ static HTAB *table_size_map = NULL;
 /* stored in shared memory */
 static TimestampTz *table_size_map_last_overflow_report = NULL;
 
-#define TABLE_SIZE_MAP_WARNING                                             \
-	"[diskquota] the number of tables reached the limit, please increase " \
+#define TABLE_SIZE_MAP_WARNING                                 \
+	"the number of tables reached the limit, please increase " \
 	"the GUC value for diskquota.max_table_segments."
 
 /* rejectmap for database objects which exceed their quota limit */
@@ -200,12 +200,12 @@ static TimestampTz disk_quota_reject_map_last_overflow_report = 0;
 /* stored in shared memory */
 static TimestampTz *local_disk_quota_reject_map_last_overflow_report = NULL;
 
-#define DISK_QUOTA_REJECT_MAP_WARNING                                        \
-	"[diskquota] the number of quota reject map entries reached the limit, " \
+#define DISK_QUOTA_REJECT_MAP_WARNING                            \
+	"the number of quota reject map entries reached the limit, " \
 	"please increase the GUC value for diskquota.max_reject_entries."
 
-#define LOCAL_DISK_QUOTA_REJECT_MAP_WARNING                                        \
-	"[diskquota] the number of local quota reject map entries reached the limit, " \
+#define LOCAL_DISK_QUOTA_REJECT_MAP_WARNING                            \
+	"the number of local quota reject map entries reached the limit, " \
 	"please increase the GUC value for diskquota.max_reject_entries."
 
 static shmem_startup_hook_type prev_shmem_startup_hook = NULL;
@@ -507,6 +507,7 @@ diskquota_worker_shmem_size()
 	size = hash_estimate_size(MAX_NUM_TABLE_SIZE_ENTRIES / diskquota_max_monitored_databases + 100,
 	                          sizeof(TableSizeEntry));
 	size = add_size(size, hash_estimate_size(diskquota_max_local_reject_entries, sizeof(LocalRejectMapEntry)));
+	size = add_size(size, hash_estimate_size(MAX_QUOTA_MAP_ENTRIES, sizeof(QuotaInfoEntry)));
 	size = add_size(size, sizeof(TimestampTz)); // table_size_map_last_overflow_report
 	size = add_size(size, sizeof(TimestampTz)); // local_disk_quota_reject_map_last_overflow_report
 	size = add_size(size, sizeof(TimestampTz)); // quota_info_map_last_overflow_report
@@ -534,8 +535,6 @@ DiskQuotaShmemSize(void)
 	{
 		size = add_size(size, diskquota_launcher_shmem_size());
 		size = add_size(size, diskquota_worker_shmem_size() * diskquota_max_monitored_databases);
-		size = add_size(size, hash_estimate_size(MAX_QUOTA_MAP_ENTRIES, sizeof(QuotaInfoEntry)) *
-		                              diskquota_max_monitored_databases);
 	}
 
 	return size;
