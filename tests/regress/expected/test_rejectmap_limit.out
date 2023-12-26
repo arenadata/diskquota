@@ -73,13 +73,13 @@ SELECT diskquota.wait_for_worker_new_epoch();
  t
 (1 row)
 
+INSERT INTO s5.a SELECT generate_series(1,10); -- should be successful
 SELECT count(*) FROM master_log WHERE line LIKE '%the number of local quota reject map entries reached the limit%' AND line NOT LIKE '%LOG%';
  count 
 -------
      1
 (1 row)
 
-INSERT INTO s5.a SELECT generate_series(1,10); -- should be successful
 DROP EXTENSION diskquota;
 \c contrib_regression
 DROP DATABASE test_reject_map_limit_01;

@@ -43,9 +43,9 @@ INSERT INTO s5.a SELECT generate_series(1,100000);
 
 SELECT diskquota.wait_for_worker_new_epoch();
 
-SELECT count(*) FROM master_log WHERE line LIKE '%the number of local quota reject map entries reached the limit%' AND line NOT LIKE '%LOG%';
-
 INSERT INTO s5.a SELECT generate_series(1,10); -- should be successful
+
+SELECT count(*) FROM master_log WHERE line LIKE '%the number of local quota reject map entries reached the limit%' AND line NOT LIKE '%LOG%';
 
 DROP EXTENSION diskquota;
 
