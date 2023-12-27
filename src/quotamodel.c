@@ -2058,6 +2058,8 @@ refresh_rejectmap(PG_FUNCTION_ARGS)
 					break;
 				}
 			}
+
+			heap_freetuple(tuple);
 		}
 		else
 		{
@@ -2119,10 +2121,6 @@ refresh_rejectmap(PG_FUNCTION_ARGS)
 				}
 			}
 			LWLockRelease(diskquota_locks.relation_cache_lock);
-		}
-		if (HeapTupleIsValid(tuple))
-		{
-			heap_freetuple(tuple);
 		}
 	}
 
