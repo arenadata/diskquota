@@ -20,7 +20,7 @@ INSERT INTO a03 values(generate_series(0, 500));
 
 \c test_tablenum_limit_02
 CREATE EXTENSION diskquota;
-
+-- we only read the current log file
 CREATE EXTERNAL WEB TABLE segment_logs(line text)
     EXECUTE 'cat $GP_SEG_DATADIR/pg_log/$(ls -Art $GP_SEG_DATADIR/pg_log | tail -n 1)'
     ON ALL FORMAT 'TEXT' (DELIMITER 'OFF');

@@ -12,6 +12,7 @@ CREATE DATABASE test_reject_map_limit_01;
 \c test_reject_map_limit_01
 CREATE EXTENSION diskquota;
 SELECT diskquota.wait_for_worker_new_epoch();
+-- we only read the current log file
 CREATE EXTERNAL WEB TABLE master_log(line text)
     EXECUTE 'cat $GP_SEG_DATADIR/pg_log/$(ls -Art $GP_SEG_DATADIR/pg_log | tail -n 1)'
     ON MASTER FORMAT 'TEXT' (DELIMITER 'OFF');
