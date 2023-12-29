@@ -68,7 +68,7 @@ static const char *active_tables_map_warning =
 static HTAB       *altered_reloid_cache                      = NULL; // Set<Oid>
 static TimestampTz altered_reloid_cache_last_overflow_report = 0;
 
-const char *altered_reloid_cache_warning =
+static const char *altered_reloid_cache_warning =
         "the number of altered reloid cache entries reached the limit, please increase "
         "the GUC value for diskquota.max_active_tables.";
 
