@@ -142,7 +142,7 @@ static HTAB *quota_info_map;
 /* stored in shared memory */
 static TimestampTz *quota_info_map_last_overflow_report = NULL;
 
-const char *quota_info_map_warning =
+static const char *quota_info_map_warning =
         "the number of quota probe reached the limit, please "
         "increase the GUC value for diskquota.max_quota_probes.";
 
@@ -188,7 +188,7 @@ static HTAB *table_size_map = NULL;
 /* stored in shared memory */
 static TimestampTz *table_size_map_last_overflow_report = NULL;
 
-const char *table_size_map_warning =
+static const char *table_size_map_warning =
         "the number of tables reached the limit, please increase "
         "the GUC value for diskquota.max_table_segments.";
 
@@ -200,11 +200,11 @@ static TimestampTz disk_quota_reject_map_last_overflow_report = 0;
 /* stored in shared memory */
 static TimestampTz *local_disk_quota_reject_map_last_overflow_report = NULL;
 
-const char *disk_quota_reject_map_warning =
+static const char *disk_quota_reject_map_warning =
         "the number of quota reject map entries reached the limit, "
         "please increase the GUC value for diskquota.max_reject_entries.";
 
-const char *local_disk_quota_reject_map_warning =
+static const char *local_disk_quota_reject_map_warning =
         "the number of local quota reject map entries reached the limit, "
         "please increase the GUC value for diskquota.max_reject_entries.";
 

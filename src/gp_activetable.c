@@ -54,7 +54,7 @@ typedef struct DiskQuotaSetOFCache
 static HTAB *active_tables_map                      = NULL; // Set<DiskQuotaActiveTableFileEntry>
 TimestampTz  active_tables_map_last_overflow_report = 0;
 
-const char *active_tables_map_warning =
+static const char *active_tables_map_warning =
         "the number of active tables reached the limit, please increase "
         "the GUC value for diskquota.max_active_tables.";
 

@@ -34,11 +34,11 @@ HTAB *relid_cache    = NULL;
 
 extern TimestampTz active_tables_map_last_overflow_report;
 
-const char *relation_cache_warning =
+static const char *relation_cache_warning =
         "the number of relation cache entries reached the limit, please increase "
         "the GUC value for diskquota.max_active_tables.";
 
-const char *relid_cache_warning =
+static const char *relid_cache_warning =
         "the number of relid cache entries reached the limit, please increase "
         "the GUC value for diskquota.max_active_tables.";
 
