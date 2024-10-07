@@ -18,7 +18,7 @@ detect the schemas or roles whose quota limit is exceeded. On the other hand,
 'soft limit' supports two kinds of encforcement:  Query loading data into
 out-of-quota schema/role will be forbidden before query is running. Query 
 loading data into schema/role with rooms will be cancelled when the quota
-limit is reached dynamically during the query is running.
+limit is reached dynamically during the query is running..
 
 # Design
 Diskquota extension is based on background worker framework in Greenplum (bg 
