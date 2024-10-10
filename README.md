@@ -1,5 +1,5 @@
 # Overview
-Diskquota is an extension that provides disk usage enforcement for database 
+Diskquota is an extension that provides disk usage enforcement for database +
 objects in Greenplum DB. Currently it supports to set quota limit on schema 
 and role in a given database and limit the amount of disk space that a schema 
 or a role can use. 
