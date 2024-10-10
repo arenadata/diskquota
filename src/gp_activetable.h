@@ -32,8 +32,8 @@ typedef struct TableEntryKey
 
 typedef struct DiskQuotaActiveTableEntry
 {
-	Oid  reloid;
-	int  segid;
+	Oid reloid;
+	int segid;
 	Size tablesize;
 } DiskQuotaActiveTableEntry;
 
