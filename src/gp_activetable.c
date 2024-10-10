@@ -1191,7 +1191,6 @@ pull_active_table_size_from_seg(HTAB *local_table_stats_map, char *active_oid_ar
 
 			/* when segid is -1, the tablesize is the sum of tablesize of master and all segments */
 			segId = -1;
-			// entry = (ActiveTableEntryCombined *)hash_search(local_table_stats_map, &reloid, HASH_ENTER, &found);
 
 			if (!found)
 			{
