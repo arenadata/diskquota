@@ -40,7 +40,7 @@ typedef struct DiskQuotaActiveTableEntry
 typedef struct ActiveTableEntryCombined
 {
 	Oid  reloid;
-	Size tablesize[];
+	Size tablesize[1]; /* variable length array */
 } ActiveTableEntryCombined;
 
 extern HTAB *gp_fetch_active_tables(bool force);
