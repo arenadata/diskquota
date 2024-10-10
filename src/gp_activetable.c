@@ -1185,7 +1185,7 @@ pull_active_table_size_from_seg(HTAB *local_table_stats_map, char *active_oid_ar
 			if (PQnfields(pgresult) == 3)
 			{
 				/* get the segid, tablesize for each table */
-				segId = atoi(PQgetvalue(pgresult, j, 2));
+				segId                       = atoi(PQgetvalue(pgresult, j, 2));
 				entry->tablesize[segId + 1] = tableSize;
 			}
 
