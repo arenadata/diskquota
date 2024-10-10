@@ -918,9 +918,8 @@ calculate_table_disk_usage(bool is_init, HTAB *local_active_table_stat_map)
 	TableSizeEntry            *tsentry = NULL;
 	Oid                        relOid;
 	HASH_SEQ_STATUS            iter;
-	DiskQuotaActiveTableEntry *active_table_entry;
+	ActiveTableEntryCombined  *active_table_entry;
 	TableSizeEntryKey          key;
-	TableEntryKey              active_table_key;
 	List                      *oidlist;
 	ListCell                  *l;
 	int                        delete_entries_num = 0;
@@ -1042,10 +1041,8 @@ calculate_table_disk_usage(bool is_init, HTAB *local_active_table_stat_map)
 
 			/* mark tsentry is_exist */
 			if (tsentry) set_table_size_entry_flag(tsentry, TABLE_EXIST);
-			active_table_key.reloid = relOid;
-			active_table_key.segid  = cur_segid;
-			active_table_entry      = (DiskQuotaActiveTableEntry *)hash_search(
-			             local_active_table_stat_map, &active_table_key, HASH_FIND, &active_tbl_found);
+			active_table_entry      = (ActiveTableEntryCombined *)hash_search(
+			             local_active_table_stat_map, &relOid, HASH_FIND, &active_tbl_found);
 
 			/* skip to recalculate the tables which are not in active list */
 			if (active_tbl_found)
@@ -1055,15 +1052,15 @@ calculate_table_disk_usage(bool is_init, HTAB *local_active_table_stat_map)
 					/* pretend process as utility mode, and append the table size on master */
 					Gp_role = GP_ROLE_UTILITY;
 
-					active_table_entry->tablesize += calculate_table_size(relOid);
+					active_table_entry->tablesize[cur_segid + 1] += calculate_table_size(relOid);
 
 					Gp_role = GP_ROLE_DISPATCH;
 				}
 				/* firstly calculate the updated total size of a table */
-				updated_total_size = active_table_entry->tablesize - TableSizeEntryGetSize(tsentry, cur_segid);
+				updated_total_size = active_table_entry->tablesize[cur_segid + 1] - TableSizeEntryGetSize(tsentry, cur_segid);
 
 				/* update the table_size entry */
-				TableSizeEntrySetSize(tsentry, cur_segid, active_table_entry->tablesize);
+				TableSizeEntrySetSize(tsentry, cur_segid, active_table_entry->tablesize[cur_segid + 1]);
 				TableSizeEntrySetFlushFlag(tsentry, cur_segid);
 
 				/* update the disk usage, there may be entries in the map whose keys are InvlidOid as the tsentry does
@@ -1347,7 +1344,7 @@ dispatch_rejectmap(HTAB *local_active_table_stat_map)
 {
 	HASH_SEQ_STATUS            hash_seq;
 	GlobalRejectMapEntry      *rejectmap_entry;
-	DiskQuotaActiveTableEntry *active_table_entry;
+	ActiveTableEntryCombined  *active_table_entry;
 	int                        num_entries, count = 0;
 	CdbPgResults               cdb_pgresults = {NULL, 0};
 	StringInfoData             rows;

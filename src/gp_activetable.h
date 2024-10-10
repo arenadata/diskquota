@@ -37,6 +37,12 @@ typedef struct DiskQuotaActiveTableEntry
 	Size tablesize;
 } DiskQuotaActiveTableEntry;
 
+typedef struct ActiveTableEntryCombined
+{
+	Oid  reloid;
+	Size tablesize[];
+} ActiveTableEntryCombined;
+
 extern HTAB *gp_fetch_active_tables(bool force);
 extern void  init_active_table_hook(void);
 extern void  init_shm_worker_active_tables(void);
