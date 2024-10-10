@@ -1190,18 +1190,12 @@ pull_active_table_size_from_seg(HTAB *local_table_stats_map, char *active_oid_ar
 			}
 
 			/* when segid is -1, the tablesize is the sum of tablesize of master and all segments */
-			segId = -1;
 
 			if (!found)
-			{
-				/* receive table size info from the first segment */
-				entry->tablesize[segId + 1] = tableSize;
-			}
-			else
-			{
-				/* sum table size from all the segments */
-				entry->tablesize[segId + 1] += tableSize;
-			}
+				entry->tablesize[0] = 0;
+
+			/* sum table size from all the segments */
+			entry->tablesize[0] += tableSize;
 		}
 	}
 	cdbdisp_clearCdbPgResults(&cdb_pgresults);
