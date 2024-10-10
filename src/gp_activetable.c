@@ -1179,29 +1179,23 @@ pull_active_table_size_from_seg(HTAB *local_table_stats_map, char *active_oid_ar
 		{
 			reloid    = atooid(PQgetvalue(pgresult, j, 0));
 			tableSize = (Size)atoll(PQgetvalue(pgresult, j, 1));
+			entry     = (ActiveTableEntryCombined *)hash_search(local_table_stats_map, &reloid, HASH_ENTER, &found);
+
 			/* for diskquota extension version is 1.0, pgresult doesn't contain segid */
 			if (PQnfields(pgresult) == 3)
 			{
 				/* get the segid, tablesize for each table */
 				segId = atoi(PQgetvalue(pgresult, j, 2));
-				entry = (ActiveTableEntryCombined *)hash_search(local_table_stats_map, &reloid, HASH_ENTER, &found);
-
-				if (!found)
-				{
-					/* receive table size info from the first segment */
-					entry->reloid = reloid;
-				}
 				entry->tablesize[segId + 1] = tableSize;
 			}
 
 			/* when segid is -1, the tablesize is the sum of tablesize of master and all segments */
 			segId = -1;
-			entry = (ActiveTableEntryCombined *)hash_search(local_table_stats_map, &reloid, HASH_ENTER, &found);
+			// entry = (ActiveTableEntryCombined *)hash_search(local_table_stats_map, &reloid, HASH_ENTER, &found);
 
 			if (!found)
 			{
 				/* receive table size info from the first segment */
-				entry->reloid               = reloid;
 				entry->tablesize[segId + 1] = tableSize;
 			}
 			else
