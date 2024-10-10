@@ -946,13 +946,13 @@ get_active_tables_oid(void)
 static void
 load_table_size(HTAB *local_table_stats_map)
 {
-	TupleDesc                  tupdesc;
-	int                        i;
-	bool                       found;
-	ActiveTableEntryCombined  *quota_entry;
-	SPIPlanPtr                 plan;
-	Portal                     portal;
-	char                      *sql = "select tableid, size, segid from diskquota.table_size";
+	TupleDesc                 tupdesc;
+	int                       i;
+	bool                      found;
+	ActiveTableEntryCombined *quota_entry;
+	SPIPlanPtr                plan;
+	Portal                    portal;
+	char                     *sql = "select tableid, size, segid from diskquota.table_size";
 
 	if ((plan = SPI_prepare(sql, 0, NULL)) == NULL)
 		ereport(ERROR, (errmsg("[diskquota] SPI_prepare(\"%s\") failed", sql)));
@@ -1015,10 +1015,10 @@ load_table_size(HTAB *local_table_stats_map)
 			size = DatumGetInt64(dat);
 			dat  = SPI_getbinval(tup, tupdesc, 3, &isnull);
 			if (isnull) continue;
-			segid      = DatumGetInt16(dat);
+			segid = DatumGetInt16(dat);
 
 			quota_entry = (ActiveTableEntryCombined *)hash_search(local_table_stats_map, &reloid, HASH_ENTER, &found);
-			quota_entry->reloid    = reloid;
+			quota_entry->reloid               = reloid;
 			quota_entry->tablesize[segid + 1] = size;
 		}
 		SPI_freetuptable(SPI_tuptable);
@@ -1160,11 +1160,11 @@ pull_active_table_size_from_seg(HTAB *local_table_stats_map, char *active_oid_ar
 	/* sum table size from each segment into local_table_stats_map */
 	for (i = 0; i < cdb_pgresults.numResults; i++)
 	{
-		Size                       tableSize;
-		bool                       found;
-		Oid                        reloid;
-		int                        segId;
-		ActiveTableEntryCombined  *entry;
+		Size                      tableSize;
+		bool                      found;
+		Oid                       reloid;
+		int                       segId;
+		ActiveTableEntryCombined *entry;
 
 		PGresult *pgresult = cdb_pgresults.pg_results[i];
 
@@ -1177,14 +1177,14 @@ pull_active_table_size_from_seg(HTAB *local_table_stats_map, char *active_oid_ar
 
 		for (j = 0; j < PQntuples(pgresult); j++)
 		{
-			reloid     = atooid(PQgetvalue(pgresult, j, 0));
-			tableSize  = (Size)atoll(PQgetvalue(pgresult, j, 1));
+			reloid    = atooid(PQgetvalue(pgresult, j, 0));
+			tableSize = (Size)atoll(PQgetvalue(pgresult, j, 1));
 			/* for diskquota extension version is 1.0, pgresult doesn't contain segid */
 			if (PQnfields(pgresult) == 3)
 			{
 				/* get the segid, tablesize for each table */
-				segId     = atoi(PQgetvalue(pgresult, j, 2));
-				entry     = (ActiveTableEntryCombined *)hash_search(local_table_stats_map, &reloid, HASH_ENTER, &found);
+				segId = atoi(PQgetvalue(pgresult, j, 2));
+				entry = (ActiveTableEntryCombined *)hash_search(local_table_stats_map, &reloid, HASH_ENTER, &found);
 
 				if (!found)
 				{
@@ -1196,12 +1196,12 @@ pull_active_table_size_from_seg(HTAB *local_table_stats_map, char *active_oid_ar
 
 			/* when segid is -1, the tablesize is the sum of tablesize of master and all segments */
 			segId = -1;
-			entry     = (ActiveTableEntryCombined *)hash_search(local_table_stats_map, &reloid, HASH_ENTER, &found);
+			entry = (ActiveTableEntryCombined *)hash_search(local_table_stats_map, &reloid, HASH_ENTER, &found);
 
 			if (!found)
 			{
 				/* receive table size info from the first segment */
-				entry->reloid    = reloid;
+				entry->reloid               = reloid;
 				entry->tablesize[segId + 1] = tableSize;
 			}
 			else
