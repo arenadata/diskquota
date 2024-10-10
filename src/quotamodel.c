@@ -1052,7 +1052,8 @@ calculate_table_disk_usage(bool is_init, HTAB *local_active_table_stat_map)
 					/* pretend process as utility mode, and append the table size on master */
 					Gp_role = GP_ROLE_UTILITY;
 
-					active_table_entry->tablesize[cur_segid + 1] += calculate_table_size(relOid);
+					/* when cur_segid is -1, the tablesize is the sum of tablesize of master and all segments */
+					active_table_entry->tablesize[0] += calculate_table_size(relOid);
 
 					Gp_role = GP_ROLE_DISPATCH;
 				}
