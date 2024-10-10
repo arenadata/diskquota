@@ -1207,7 +1207,7 @@ pull_active_table_size_from_seg(HTAB *local_table_stats_map, char *active_oid_ar
 			else
 			{
 				/* sum table size from all the segments */
-				entry->tablesize[segId + 1] = entry->tablesize[segId + 1] + tableSize;
+				entry->tablesize[segId + 1] += tableSize;
 			}
 		}
 	}
