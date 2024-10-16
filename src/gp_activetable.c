@@ -375,11 +375,11 @@ gp_fetch_active_tables(bool is_init)
 
 	memset(&ctl, 0, sizeof(ctl));
 	ctl.keysize   = sizeof(Oid);
-	ctl.entrysize = offsetof(ActiveTableEntryCombined, tablesize) + (SEGCOUNT + 1) * sizeof(Size);
+	ctl.entrysize = sizeof(ActiveTableEntryCombined) + SEGCOUNT * sizeof(Size);
 	ctl.hcxt      = CurrentMemoryContext;
 
 	local_table_stats_map = diskquota_hash_create("local active table map with relfilenode info", 1024, &ctl,
-	                                              HASH_ELEM | HASH_CONTEXT, DISKQUOTA_TAG_HASH);
+	                                              HASH_ELEM | HASH_CONTEXT, DISKQUOTA_OID_HASH);
 
 	if (is_init)
 	{
