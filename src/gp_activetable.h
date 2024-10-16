@@ -39,7 +39,7 @@ typedef struct DiskQuotaActiveTableEntry
 
 typedef struct ActiveTableEntryCombined
 {
-	Oid  reloid;
+	Oid reloid;
 	/*
 	 Variable length array: index 0 is used for the coordinator,
 	 the remaining SEGCOUNT indexes are for segments.
