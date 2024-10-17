@@ -952,14 +952,14 @@ load_table_size(HTAB *local_table_stats_map)
 	ActiveTableEntryCombined *quota_entry;
 	SPIPlanPtr                plan;
 	Portal                    portal;
-	char                     *sql = "select tableid, size, segid from diskquota.table_size";
+	char                     *sql = "select tableid, array_agg(size order by segid) size from diskquota.table_size group by tableid order by 1";
 
 	if ((plan = SPI_prepare(sql, 0, NULL)) == NULL)
 		ereport(ERROR, (errmsg("[diskquota] SPI_prepare(\"%s\") failed", sql)));
 	if ((portal = SPI_cursor_open(NULL, plan, NULL, NULL, true)) == NULL)
 		ereport(ERROR, (errmsg("[diskquota] SPI_cursor_open(\"%s\") failed", sql)));
 
-	SPI_cursor_fetch(portal, true, 10000);
+	SPI_cursor_fetch(portal, true, 1000);
 
 	if (SPI_tuptable == NULL)
 	{
@@ -968,25 +968,24 @@ load_table_size(HTAB *local_table_stats_map)
 
 	tupdesc = SPI_tuptable->tupdesc;
 #if GP_VERSION_NUM < 70000
-	if (tupdesc->natts != 3 || ((tupdesc)->attrs[0])->atttypid != OIDOID ||
-	    ((tupdesc)->attrs[1])->atttypid != INT8OID || ((tupdesc)->attrs[2])->atttypid != INT2OID)
+	if (tupdesc->natts != 2 || ((tupdesc)->attrs[0])->atttypid != OIDOID ||
+	    ((tupdesc)->attrs[1])->atttypid != INT8ARRAYOID)
 #else
-	if (tupdesc->natts != 3 || ((tupdesc)->attrs[0]).atttypid != OIDOID || ((tupdesc)->attrs[1]).atttypid != INT8OID ||
-	    ((tupdesc)->attrs[2]).atttypid != INT2OID)
+	if (tupdesc->natts != 2 || ((tupdesc)->attrs[0]).atttypid != OIDOID || ((tupdesc)->attrs[1]).atttypid != INT8ARRAYOID)
 #endif /* GP_VERSION_NUM */
 	{
-		if (tupdesc->natts != 3)
+		if (tupdesc->natts != 2)
 		{
 			ereport(WARNING, (errmsg("[diskquota] tupdesc->natts: %d", tupdesc->natts)));
 		}
 		else
 		{
 #if GP_VERSION_NUM < 70000
-			ereport(WARNING, (errmsg("[diskquota] attrs: %d, %d, %d", tupdesc->attrs[0]->atttypid,
-			                         tupdesc->attrs[1]->atttypid, tupdesc->attrs[2]->atttypid)));
+			ereport(WARNING, (errmsg("[diskquota] attrs: %d, %d", tupdesc->attrs[0]->atttypid,
+			                         tupdesc->attrs[1]->atttypid)));
 #else
-			ereport(WARNING, (errmsg("[diskquota] attrs: %d, %d, %d", tupdesc->attrs[0].atttypid,
-			                         tupdesc->attrs[1].atttypid, tupdesc->attrs[2].atttypid)));
+			ereport(WARNING, (errmsg("[diskquota] attrs: %d, %d", tupdesc->attrs[0].atttypid,
+			                         tupdesc->attrs[1].atttypid)));
 #endif /* GP_VERSION_NUM */
 		}
 		ereport(ERROR, (errmsg("[diskquota] table \"table_size\" is corrupted in database \"%s\","
@@ -1001,10 +1000,10 @@ load_table_size(HTAB *local_table_stats_map)
 		{
 			HeapTuple tup = SPI_tuptable->vals[i];
 			Datum     dat;
+			Datum	   *sizes;
 			Oid       reloid;
-			int64     size;
-			int16     segid;
 			bool      isnull;
+			int			nelems;
 
 			dat = SPI_getbinval(tup, tupdesc, 1, &isnull);
 			if (isnull) continue;
@@ -1012,17 +1011,22 @@ load_table_size(HTAB *local_table_stats_map)
 
 			dat = SPI_getbinval(tup, tupdesc, 2, &isnull);
 			if (isnull) continue;
-			size = DatumGetInt64(dat);
-			dat  = SPI_getbinval(tup, tupdesc, 3, &isnull);
-			if (isnull) continue;
-			segid = DatumGetInt16(dat);
 
 			quota_entry = (ActiveTableEntryCombined *)hash_search(local_table_stats_map, &reloid, HASH_ENTER, &found);
 			quota_entry->reloid               = reloid;
-			quota_entry->tablesize[segid + 1] = size;
+
+			/*
+			 select typlen, typbyval, typalign from pg_type where typname = 'int8';
+			 typlen | typbyval | typalign
+			--------+----------+----------
+			      8 | t        | d
+			*/
+			deconstruct_array(DatumGetArrayTypeP(dat), INT8OID, sizeof(int64), true, 'd', &sizes, NULL, &nelems);
+			for (i = 0; i < nelems; i++)
+				quota_entry->tablesize[i] = DatumGetInt64(sizes[i]);
 		}
 		SPI_freetuptable(SPI_tuptable);
-		SPI_cursor_fetch(portal, true, 10000);
+		SPI_cursor_fetch(portal, true, 1000);
 	}
 
 	SPI_freetuptable(SPI_tuptable);
