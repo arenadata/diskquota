@@ -220,7 +220,7 @@ static void transfer_table_for_quota(int64 totalsize, QuotaType type, Oid *old_k
 
 /* functions to refresh disk quota model*/
 static void refresh_disk_quota_usage(bool is_init);
-static void calculate_table_disk_usage(bool is_init, HTAB *local_active_table_stat_map);
+static HTAB *calculate_table_disk_usage(bool is_init);
 static void flush_to_table_size(void);
 static bool flush_local_reject_map(void);
 static void dispatch_rejectmap(HTAB *local_active_table_stat_map);
@@ -829,11 +829,8 @@ refresh_disk_quota_usage(bool is_init)
 		 * local_active_table_stat_map only contains the active tables which belong
 		 * to the current database.
 		 */
-		local_active_table_stat_map = gp_fetch_active_tables(is_init);
+		local_active_table_stat_map = calculate_table_disk_usage(is_init);
 		bool hasActiveTable         = (hash_get_num_entries(local_active_table_stat_map) != 0);
-		/* TODO: if we can skip the following steps when there is no active table */
-		/* recalculate the disk usage of table, schema and role */
-		calculate_table_disk_usage(is_init, local_active_table_stat_map);
 		/* refresh quota_info_map */
 		refresh_quota_info_map();
 		/* flush local table_size_map to user table table_size */
@@ -909,8 +906,8 @@ merge_uncommitted_table_to_oidlist(List *oidlist)
  *  size from table table_size
  */
 
-static void
-calculate_table_disk_usage(bool is_init, HTAB *local_active_table_stat_map)
+static HTAB *
+calculate_table_disk_usage(bool is_init)
 {
 	bool                      table_size_map_found;
 	bool                      active_tbl_found;
@@ -926,6 +923,8 @@ calculate_table_disk_usage(bool is_init, HTAB *local_active_table_stat_map)
 	StringInfoData            delete_statement;
 
 	initStringInfo(&delete_statement);
+
+	HTAB *local_active_table_stat_map = gp_fetch_active_tables(is_init);
 
 	/*
 	 * unset is_exist flag for tsentry in table_size_map this is used to
@@ -1147,6 +1146,8 @@ calculate_table_disk_usage(bool is_init, HTAB *local_active_table_stat_map)
 			}
 		}
 	}
+
+	return local_active_table_stat_map;
 }
 
 static void
