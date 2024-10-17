@@ -1022,8 +1022,9 @@ load_table_size(HTAB *local_table_stats_map)
 			      8 | t        | d
 			*/
 			deconstruct_array(DatumGetArrayTypeP(dat), INT8OID, sizeof(int64), true, 'd', &sizes, NULL, &nelems);
-			for (i = 0; i < nelems; i++)
-				quota_entry->tablesize[i] = DatumGetInt64(sizes[i]);
+			for (int j = 0; j < nelems; j++)
+				quota_entry->tablesize[j] = DatumGetInt64(sizes[j]);
+			pfree(sizes);
 		}
 		SPI_freetuptable(SPI_tuptable);
 		SPI_cursor_fetch(portal, true, 1000);
