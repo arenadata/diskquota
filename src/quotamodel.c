@@ -966,6 +966,8 @@ calculate_table_disk_usage(bool is_init)
 			{
 				reltablespace = MyDatabaseTableSpace;
 			}
+
+			heap_freetuple(classTup);
 		}
 		else
 		{
@@ -1111,10 +1113,6 @@ calculate_table_disk_usage(bool is_init)
 				tsentry->owneroid      = relowner;
 				tsentry->tablespaceoid = reltablespace;
 			}
-		}
-		if (HeapTupleIsValid(classTup))
-		{
-			heap_freetuple(classTup);
 		}
 	}
 
