@@ -220,10 +220,10 @@ static void transfer_table_for_quota(int64 totalsize, QuotaType type, Oid *old_k
 
 /* functions to refresh disk quota model*/
 static void refresh_disk_quota_usage(bool is_init);
-static void calculate_table_disk_usage(bool is_init, HTAB *local_active_table_stat_map);
+static StringInfoData calculate_table_disk_usage(bool is_init);
 static void flush_to_table_size(void);
 static bool flush_local_reject_map(void);
-static void dispatch_rejectmap(HTAB *local_active_table_stat_map);
+static void dispatch_rejectmap(StringInfoData active_oids);
 static bool load_quotas(void);
 static void do_load_quotas(void);
 
@@ -803,7 +803,7 @@ refresh_disk_quota_usage(bool is_init)
 	bool  connected                   = false;
 	bool  pushed_active_snap          = false;
 	bool  ret                         = true;
-	HTAB *local_active_table_stat_map = NULL;
+	StringInfoData active_oids;
 
 	StartTransactionCommand();
 
@@ -826,14 +826,11 @@ refresh_disk_quota_usage(bool is_init)
 		 * initialization stage all the tables are active. later loop, only the
 		 * tables whose disk size changed will be treated as active
 		 *
-		 * local_active_table_stat_map only contains the active tables which belong
+		 * active_oids only contains the active tables which belong
 		 * to the current database.
 		 */
-		local_active_table_stat_map = gp_fetch_active_tables(is_init);
-		bool hasActiveTable         = (hash_get_num_entries(local_active_table_stat_map) != 0);
-		/* TODO: if we can skip the following steps when there is no active table */
-		/* recalculate the disk usage of table, schema and role */
-		calculate_table_disk_usage(is_init, local_active_table_stat_map);
+		active_oids = calculate_table_disk_usage(is_init);
+		bool hasActiveTable         = (active_oids.len > 0);
 		/* refresh quota_info_map */
 		refresh_quota_info_map();
 		/* flush local table_size_map to user table table_size */
@@ -847,8 +844,8 @@ refresh_disk_quota_usage(bool is_init)
 		 * not empty the rejectmap should be dispatched to segments.
 		 */
 		if (is_init || (diskquota_hardlimit && (reject_map_changed || hasActiveTable)))
-			dispatch_rejectmap(local_active_table_stat_map);
-		hash_destroy(local_active_table_stat_map);
+			dispatch_rejectmap(active_oids);
+		pfree(active_oids.data);
 	}
 	PG_CATCH();
 	{
@@ -909,8 +906,8 @@ merge_uncommitted_table_to_oidlist(List *oidlist)
  *  size from table table_size
  */
 
-static void
-calculate_table_disk_usage(bool is_init, HTAB *local_active_table_stat_map)
+static StringInfoData
+calculate_table_disk_usage(bool is_init)
 {
 	bool                      table_size_map_found;
 	bool                      active_tbl_found;
@@ -926,6 +923,8 @@ calculate_table_disk_usage(bool is_init, HTAB *local_active_table_stat_map)
 	StringInfoData            delete_statement;
 
 	initStringInfo(&delete_statement);
+
+	HTAB *local_active_table_stat_map = gp_fetch_active_tables(is_init);
 
 	/*
 	 * unset is_exist flag for tsentry in table_size_map this is used to
@@ -1147,6 +1146,20 @@ calculate_table_disk_usage(bool is_init, HTAB *local_active_table_stat_map)
 			}
 		}
 	}
+
+	HASH_SEQ_STATUS           hash_seq;
+	StringInfoData            active_oids;
+	int count       = 0;
+	int num_entries = hash_get_num_entries(local_active_table_stat_map);
+	initStringInfo(&active_oids);
+	hash_seq_init(&hash_seq, local_active_table_stat_map);
+	while ((active_table_entry = hash_seq_search(&hash_seq)) != NULL)
+	{
+		appendStringInfo(&active_oids, "%d", active_table_entry->reloid);
+
+		if (++count != num_entries) appendStringInfo(&active_oids, ",");
+	}
+	return active_oids;
 }
 
 static void
@@ -1342,19 +1355,16 @@ flush_local_reject_map(void)
  * Dispatch rejectmap to segment servers.
  */
 static void
-dispatch_rejectmap(HTAB *local_active_table_stat_map)
+dispatch_rejectmap(StringInfoData active_oids)
 {
 	HASH_SEQ_STATUS           hash_seq;
 	GlobalRejectMapEntry     *rejectmap_entry;
-	ActiveTableEntryCombined *active_table_entry;
 	int                       num_entries, count = 0;
 	CdbPgResults              cdb_pgresults = {NULL, 0};
 	StringInfoData            rows;
-	StringInfoData            active_oids;
 	StringInfoData            sql;
 
 	initStringInfo(&rows);
-	initStringInfo(&active_oids);
 	initStringInfo(&sql);
 
 	LWLockAcquire(diskquota_locks.reject_map_lock, LW_SHARED);
@@ -1370,16 +1380,6 @@ dispatch_rejectmap(HTAB *local_active_table_stat_map)
 	}
 	LWLockRelease(diskquota_locks.reject_map_lock);
 
-	count       = 0;
-	num_entries = hash_get_num_entries(local_active_table_stat_map);
-	hash_seq_init(&hash_seq, local_active_table_stat_map);
-	while ((active_table_entry = hash_seq_search(&hash_seq)) != NULL)
-	{
-		appendStringInfo(&active_oids, "%d", active_table_entry->reloid);
-
-		if (++count != num_entries) appendStringInfo(&active_oids, ",");
-	}
-
 	appendStringInfo(&sql,
 	                 "select diskquota.refresh_rejectmap("
 	                 "ARRAY[%s]::diskquota.rejectmap_entry[], "
@@ -1388,7 +1388,6 @@ dispatch_rejectmap(HTAB *local_active_table_stat_map)
 	CdbDispatchCommand(sql.data, DF_NONE, &cdb_pgresults);
 
 	pfree(rows.data);
-	pfree(active_oids.data);
 	pfree(sql.data);
 	cdbdisp_clearCdbPgResults(&cdb_pgresults);
 }
