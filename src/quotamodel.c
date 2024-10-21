@@ -868,34 +868,6 @@ refresh_disk_quota_usage(bool is_init)
 	return;
 }
 
-static List *
-merge_uncommitted_table_to_oidlist(List *oidlist)
-{
-	HASH_SEQ_STATUS              iter;
-	DiskQuotaRelationCacheEntry *entry;
-
-	if (relation_cache == NULL)
-	{
-		return oidlist;
-	}
-
-	remove_committed_relation_from_cache();
-
-	LWLockAcquire(diskquota_locks.relation_cache_lock, LW_SHARED);
-	hash_seq_init(&iter, relation_cache);
-	while ((entry = hash_seq_search(&iter)) != NULL)
-	{
-		/* The session of db1 should not see the table inside db2. */
-		if (entry->primary_table_relid == entry->relid && entry->rnode.node.dbNode == MyDatabaseId)
-		{
-			oidlist = lappend_oid(oidlist, entry->relid);
-		}
-	}
-	LWLockRelease(diskquota_locks.relation_cache_lock);
-
-	return oidlist;
-}
-
 /*
  *  Incremental way to update the disk quota of every database objects
  *  Recalculate the table's disk usage when it's a new table or active table.
@@ -942,8 +914,6 @@ calculate_table_disk_usage(bool is_init)
 	 * and role_size_map
 	 */
 	oidlist = get_rel_oid_list(is_init);
-
-	oidlist = merge_uncommitted_table_to_oidlist(oidlist);
 
 	foreach (l, oidlist)
 	{

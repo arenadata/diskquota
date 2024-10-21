@@ -1305,7 +1305,7 @@ get_rel_oid_list(bool is_init)
 	List *oidlist = NIL;
 	int   ret;
 
-#define SELECT_FROM_PG_CATALOG_PG_CLASS "select unnest(array_remove(array[c.oid, indexrelid], null)) from pg_catalog.pg_class c left join pg_catalog.pg_index i on c.oid = indrelid where c.oid >= $1 and relkind in ('r', 'm')"
+#define SELECT_FROM_PG_CATALOG_PG_CLASS "select unnest(array_remove(array[c.oid, indexrelid], null)) from pg_catalog.pg_class c left join pg_catalog.pg_index i on c.oid = indrelid where c.oid >= $1 and relkind in ('r', 'm') union distinct select relid from diskquota.show_relation_cache() where relid = primary_table_oid"
 
 	ret = SPI_execute_with_args(is_init ? SELECT_FROM_PG_CATALOG_PG_CLASS
 	                                    " union distinct"
