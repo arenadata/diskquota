@@ -868,6 +868,21 @@ refresh_disk_quota_usage(bool is_init)
 	return;
 }
 
+static Datum SPI_getbinval_my(HeapTuple tuple, TupleDesc tupdesc, const char *fname, bool allow_null, Oid typeid)
+{
+    bool isnull;
+    Datum datum;
+    int fnumber = SPI_fnumber(tupdesc, fname);
+    if (SPI_gettypeid(tupdesc, fnumber) != typeid)
+		ereport(ERROR, (errcode(ERRCODE_MOST_SPECIFIC_TYPE_MISMATCH), errmsg("type of column \"%s\" must be \"%i\"", fname, typeid)));
+    datum = SPI_getbinval(tuple, tupdesc, fnumber, &isnull);
+    if (allow_null)
+		return datum;
+    if (isnull)
+		ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("column \"%s\" must not be null", fname)));
+    return datum;
+}
+
 /*
  *  Incremental way to update the disk quota of every database objects
  *  Recalculate the table's disk usage when it's a new table or active table.
@@ -889,10 +904,13 @@ calculate_table_disk_usage(bool is_init)
 	HASH_SEQ_STATUS           iter;
 	ActiveTableEntryCombined *active_table_entry;
 	TableSizeEntryKey         key;
-	List                     *oidlist;
-	ListCell                 *l;
 	int                       delete_entries_num = 0;
 	StringInfoData            delete_statement;
+	SPIPlanPtr plan;
+	Portal portal;
+	StringInfoData            sql;
+	initStringInfo(&sql);
+	appendStringInfoString(&sql, "select unnest(array_remove(array[c.oid, indexrelid], null)) oid from pg_catalog.pg_class c left join pg_catalog.pg_index i on c.oid = indrelid where c.oid >= $1 and relkind in ('r', 'm') union distinct select relid from diskquota.show_relation_cache() where relid = primary_table_oid");
 
 	initStringInfo(&delete_statement);
 
@@ -913,16 +931,30 @@ calculate_table_disk_usage(bool is_init)
 	 * calculate the file size for active table and update namespace_size_map
 	 * and role_size_map
 	 */
-	oidlist = get_rel_oid_list(is_init);
+	if (is_init)
+		appendStringInfoString(&sql, " union distinct select tableid from diskquota.table_size where segid = -1");
 
-	foreach (l, oidlist)
+	if ((plan = SPI_prepare(sql.data, 1, (Oid[]){OIDOID})) == NULL)
+		ereport(ERROR, (errmsg("[diskquota] SPI_prepare(\"%s\") failed", sql.data)));
+
+	if ((portal = SPI_cursor_open(NULL, plan, (Datum[]){ObjectIdGetDatum(FirstNormalObjectId)}, NULL, true)) == NULL)
+		ereport(ERROR, (errmsg("[diskquota] SPI_cursor_open(\"%s\") failed", sql.data)));
+
+	do
 	{
+		SPI_freetuptable(SPI_tuptable);
+		SPI_cursor_fetch(portal, true, 10000);
+		for (uint64 row = 0; row < SPI_processed; row++)
+		{
+			HeapTuple val = SPI_tuptable->vals[row];
+			TupleDesc tupdesc = SPI_tuptable->tupdesc;
 		HeapTuple     classTup;
 		Form_pg_class classForm     = NULL;
 		Oid           relnamespace  = InvalidOid;
 		Oid           relowner      = InvalidOid;
 		Oid           reltablespace = InvalidOid;
-		relOid                      = lfirst_oid(l);
+       relOid = DatumGetObjectId(SPI_getbinval_my(val, tupdesc, "oid", false, OIDOID));
+	   elog(WARNING, "relOid = %i", relOid);
 
 		classTup = SearchSysCacheCopy1(RELOID, ObjectIdGetDatum(relOid));
 		if (HeapTupleIsValid(classTup))
@@ -1084,12 +1116,16 @@ calculate_table_disk_usage(bool is_init)
 				tsentry->tablespaceoid = reltablespace;
 			}
 		}
-	}
+		}
+	} while (SPI_processed);
+
+	SPI_freetuptable(SPI_tuptable);
+	SPI_cursor_close(portal);
+	SPI_freeplan(plan);
 
 	if (delete_entries_num) delete_from_table_size_map(delete_statement.data);
 
 	pfree(delete_statement.data);
-	list_free(oidlist);
 
 	/*
 	 * Process removed tables. Reduce schema and role size firstly. Remove
