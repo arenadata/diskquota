@@ -900,7 +900,6 @@ calculate_table_disk_usage(bool is_init)
 	bool                      active_tbl_found;
 	int64                     updated_total_size;
 	TableSizeEntry           *tsentry = NULL;
-	Oid                       relOid;
 	HASH_SEQ_STATUS           iter;
 	ActiveTableEntryCombined *active_table_entry;
 	TableSizeEntryKey         key;
@@ -914,7 +913,7 @@ calculate_table_disk_usage(bool is_init)
 	if (is_init)
 		appendStringInfoString(&sql, "with c as (");
 
-	appendStringInfoString(&sql, "select oid, relowner, relnamespace, reltablespace from pg_catalog.pg_class where oid >= $1 and relkind in ('r', 'm') union select i.oid, i.relowner, i.relnamespace, i.reltablespace from pg_catalog.pg_index join pg_catalog.pg_class c on c.oid = indrelid join pg_catalog.pg_class i on i.oid = indexrelid where c.oid >= $1 and c.relkind in ('r', 'm') and i.oid >= $1 and i.relkind = 'i' union select relid, owneroid, namespaceoid, spcnode from diskquota.show_relation_cache() where relid = primary_table_oid");
+	appendStringInfoString(&sql, "select oid, relowner, relnamespace, reltablespace, 1 as type from pg_catalog.pg_class where oid >= $1 and relkind in ('r', 'm') union select i.oid, i.relowner, i.relnamespace, i.reltablespace, 2 from pg_catalog.pg_index join pg_catalog.pg_class c on c.oid = indrelid join pg_catalog.pg_class i on i.oid = indexrelid where c.oid >= $1 and c.relkind in ('r', 'm') and i.oid >= $1 and i.relkind = 'i' union select relid, owneroid, namespaceoid, spcnode, 3 from diskquota.show_relation_cache() where relid = primary_table_oid");
 
 	initStringInfo(&delete_statement);
 
@@ -937,7 +936,7 @@ calculate_table_disk_usage(bool is_init)
 	 * and role_size_map
 	 */
 	if (is_init)
-		appendStringInfoString(&sql, ") select coalesce(oid, tableid) oid, relowner, relnamespace, reltablespace from c full join diskquota.table_size t on tableid = oid where coalesce(segid, -1) = -1");
+		appendStringInfoString(&sql, ") select coalesce(oid, tableid) oid, coalesce(relowner, 0) relowner, coalesce(relnamespace, 0) relnamespace, coalesce(reltablespace, 0) reltablespace, coalesce(type, 0) type from c full join diskquota.table_size t on tableid = oid where coalesce(segid, -1) = -1");
 
 	if ((plan = SPI_prepare(sql.data, 1, (Oid[]){OIDOID})) == NULL)
 		ereport(ERROR, (errmsg("[diskquota] SPI_prepare(\"%s\") failed", sql.data)));
@@ -953,40 +952,17 @@ calculate_table_disk_usage(bool is_init)
 		{
 			HeapTuple val = SPI_tuptable->vals[row];
 			TupleDesc tupdesc = SPI_tuptable->tupdesc;
-		HeapTuple     classTup;
-		Form_pg_class classForm     = NULL;
-		Oid           relnamespace  = InvalidOid;
-		Oid           relowner      = InvalidOid;
-		Oid           reltablespace = InvalidOid;
-       relOid = DatumGetObjectId(SPI_getbinval_my(val, tupdesc, "oid", false, OIDOID));
-	   elog(WARNING, "relOid = %i", relOid);
-
-		classTup = SearchSysCacheCopy1(RELOID, ObjectIdGetDatum(relOid));
-		if (HeapTupleIsValid(classTup))
-		{
-			classForm     = (Form_pg_class)GETSTRUCT(classTup);
-			relnamespace  = classForm->relnamespace;
-			relowner      = classForm->relowner;
-			reltablespace = classForm->reltablespace;
+			Oid           relnamespace  = DatumGetObjectId(SPI_getbinval_my(val, tupdesc, "relnamespace", false, OIDOID));
+			Oid           relowner      = DatumGetObjectId(SPI_getbinval_my(val, tupdesc, "relowner", false, OIDOID));
+			Oid           reltablespace = DatumGetObjectId(SPI_getbinval_my(val, tupdesc, "reltablespace", false, OIDOID));
+       		Oid relOid = DatumGetObjectId(SPI_getbinval_my(val, tupdesc, "oid", false, OIDOID));
+       		int type = DatumGetInt32(SPI_getbinval_my(val, tupdesc, "type", false, INT4OID));
 
 			if (!OidIsValid(reltablespace))
-			{
 				reltablespace = MyDatabaseTableSpace;
-			}
 
-			heap_freetuple(classTup);
-		}
-		else
-		{
-			LWLockAcquire(diskquota_locks.relation_cache_lock, LW_SHARED);
-			DiskQuotaRelationCacheEntry *relation_entry = hash_search(relation_cache, &relOid, HASH_FIND, NULL);
-			if (relation_entry == NULL)
+			if (is_init && type == 0)
 			{
-				elog(WARNING, "cache lookup failed for relation %u", relOid);
-				LWLockRelease(diskquota_locks.relation_cache_lock);
-
-				if (!is_init) continue;
-
 				for (int i = -1; i < SEGCOUNT; i++)
 				{
 					appendStringInfo(&delete_statement, "%s(%u,%d)", (delete_entries_num == 0) ? " " : ", ", relOid, i);
@@ -1003,11 +979,6 @@ calculate_table_disk_usage(bool is_init)
 
 				continue;
 			}
-			relnamespace  = relation_entry->namespaceoid;
-			relowner      = relation_entry->owneroid;
-			reltablespace = relation_entry->rnode.node.spcNode;
-			LWLockRelease(diskquota_locks.relation_cache_lock);
-		}
 
 		/*
 		 * The segid is the same as the content id in gp_segment_configuration
