@@ -386,8 +386,6 @@ show_relation_cache(PG_FUNCTION_ARGS)
 		relation_cache_ctx->relation_cache = diskquota_hash_create("relation_cache_ctx->relation_cache", 1024, &hashctl,
 		                                                           HASH_ELEM | HASH_CONTEXT, DISKQUOTA_OID_HASH);
 
-		remove_committed_relation_from_cache();
-
 		LWLockAcquire(diskquota_locks.relation_cache_lock, LW_SHARED);
 		hash_seq_init(&hash_seq, relation_cache);
 		while ((entry = (DiskQuotaRelationCacheEntry *)hash_seq_search(&hash_seq)) != NULL)

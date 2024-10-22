@@ -910,7 +910,7 @@ calculate_table_disk_usage(bool is_init)
 	Portal portal;
 	StringInfoData            sql;
 	initStringInfo(&sql);
-	appendStringInfoString(&sql, "select unnest(array_remove(array[c.oid, indexrelid], null)) oid from pg_catalog.pg_class c left join pg_catalog.pg_index i on c.oid = indrelid where c.oid >= $1 and relkind in ('r', 'm') union distinct select relid from diskquota.show_relation_cache() where relid = primary_table_oid");
+	appendStringInfoString(&sql, "select oid from pg_catalog.pg_class where oid >= $1 and relkind in ('r', 'm') union select indexrelid from pg_catalog.pg_index join pg_catalog.pg_class c on c.oid = indrelid where c.oid >= $1 and relkind in ('r', 'm') union select relid from diskquota.show_relation_cache() where relid = primary_table_oid");
 
 	initStringInfo(&delete_statement);
 
@@ -926,6 +926,7 @@ calculate_table_disk_usage(bool is_init)
 		reset_table_size_entry_flag(tsentry, TABLE_EXIST);
 	}
 
+	remove_committed_relation_from_cache();
 	/*
 	 * scan pg_class to detect table event: drop, reset schema, reset owner.
 	 * calculate the file size for active table and update namespace_size_map
