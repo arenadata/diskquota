@@ -914,7 +914,7 @@ calculate_table_disk_usage(bool is_init)
 	if (is_init)
 		appendStringInfoString(&sql, "with c as (");
 
-	appendStringInfoString(&sql, "select oid from pg_catalog.pg_class where oid >= $1 and relkind in ('r', 'm') union select indexrelid from pg_catalog.pg_index join pg_catalog.pg_class c on c.oid = indrelid join pg_catalog.pg_class i on i.oid = indexrelid where c.oid >= $1 and c.relkind in ('r', 'm') and i.oid >= $1 and i.relkind = 'i' union select relid from diskquota.show_relation_cache() where relid = primary_table_oid");
+	appendStringInfoString(&sql, "select oid, relowner, relnamespace, reltablespace from pg_catalog.pg_class where oid >= $1 and relkind in ('r', 'm') union select i.oid, i.relowner, i.relnamespace, i.reltablespace from pg_catalog.pg_index join pg_catalog.pg_class c on c.oid = indrelid join pg_catalog.pg_class i on i.oid = indexrelid where c.oid >= $1 and c.relkind in ('r', 'm') and i.oid >= $1 and i.relkind = 'i' union select relid, owneroid, namespaceoid, spcnode from diskquota.show_relation_cache() where relid = primary_table_oid");
 
 	initStringInfo(&delete_statement);
 
@@ -937,7 +937,7 @@ calculate_table_disk_usage(bool is_init)
 	 * and role_size_map
 	 */
 	if (is_init)
-		appendStringInfoString(&sql, ") select coalesce(oid, tableid) oid from c full join diskquota.table_size t on tableid = oid where coalesce(segid, -1) = -1");
+		appendStringInfoString(&sql, ") select coalesce(oid, tableid) oid, relowner, relnamespace, reltablespace from c full join diskquota.table_size t on tableid = oid where coalesce(segid, -1) = -1");
 
 	if ((plan = SPI_prepare(sql.data, 1, (Oid[]){OIDOID})) == NULL)
 		ereport(ERROR, (errmsg("[diskquota] SPI_prepare(\"%s\") failed", sql.data)));
