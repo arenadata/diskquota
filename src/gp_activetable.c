@@ -98,7 +98,6 @@ static Oid            get_dbid(ArrayType *array);
 void  init_active_table_hook(void);
 void  init_shm_worker_active_tables(void);
 void  init_lock_active_tables(void);
-// void  gp_fetch_active_tables(StringInfo sql, bool is_init);
 
 /*
  * Init active_tables_map shared memory
