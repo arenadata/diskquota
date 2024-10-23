@@ -410,7 +410,6 @@ append_active_tables(StringInfo sql, bool is_init)
 				                PQresultStatus(pgresult))));
 			}
 
-			/* push the active table oid into local_active_table_oid_map */
 			for (int j = 0; j < PQntuples(pgresult); j++)
 			{
 				if (count++ > 0) appendStringInfoString(sql, ",");

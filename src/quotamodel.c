@@ -1023,9 +1023,8 @@ calculate_table_disk_usage(StringInfo active_oids, bool is_init)
 
 			if (tablesize[0] != -1)
 			{
-				appendStringInfo(active_oids, "%d", relOid);
-
 				if (count++ > 0) appendStringInfo(active_oids, ",");
+				appendStringInfo(active_oids, "%d", relOid);
 			}
 
 			/*
