@@ -220,10 +220,10 @@ static void transfer_table_for_quota(int64 totalsize, QuotaType type, Oid *old_k
 
 /* functions to refresh disk quota model*/
 static void refresh_disk_quota_usage(bool is_init);
-static StringInfoData calculate_table_disk_usage(bool is_init);
+static void calculate_table_disk_usage(StringInfo active_oids, bool is_init);
 static void flush_to_table_size(void);
 static bool flush_local_reject_map(void);
-static void dispatch_rejectmap(StringInfoData active_oids);
+static void dispatch_rejectmap(char *active_oids);
 static bool load_quotas(void);
 static void do_load_quotas(void);
 
@@ -829,7 +829,8 @@ refresh_disk_quota_usage(bool is_init)
 		 * active_oids only contains the active tables which belong
 		 * to the current database.
 		 */
-		active_oids = calculate_table_disk_usage(is_init);
+		initStringInfo(&active_oids);
+		calculate_table_disk_usage(&active_oids, is_init);
 		bool hasActiveTable         = (active_oids.len > 0);
 		/* refresh quota_info_map */
 		refresh_quota_info_map();
@@ -844,7 +845,7 @@ refresh_disk_quota_usage(bool is_init)
 		 * not empty the rejectmap should be dispatched to segments.
 		 */
 		if (is_init || (diskquota_hardlimit && (reject_map_changed || hasActiveTable)))
-			dispatch_rejectmap(active_oids);
+			dispatch_rejectmap(active_oids.data);
 		pfree(active_oids.data);
 	}
 	PG_CATCH();
@@ -893,8 +894,8 @@ static Datum SPI_getbinval_my(HeapTuple tuple, TupleDesc tupdesc, const char *fn
  *  size from table table_size
  */
 
-static StringInfoData
-calculate_table_disk_usage(bool is_init)
+static void
+calculate_table_disk_usage(StringInfo active_oids, bool is_init)
 {
 	bool                      table_size_map_found;
 	int64                     updated_total_size;
@@ -906,14 +907,31 @@ calculate_table_disk_usage(bool is_init)
 	SPIPlanPtr plan;
 	Portal portal;
 	StringInfoData            sql;
+	int count       = 0;
+	int16                      typlen;
+	bool                       typbyval;
+	char                       typalign;
+
+	get_typlenbyvalalign(INT8OID, &typlen, &typbyval, &typalign);
+
 	initStringInfo(&sql);
 	initStringInfo(&delete_statement);
 
+	/*
+	 * Get info of the tables which diskquota
+	 * needs to care about in the database.
+	 * Firstly the all the table which relkind is 'r'
+	 * or 'm' and not system table. Also, fetch the indexes of those tables.
+	 */
 	appendStringInfoString(&sql, "with c as (select oid, relowner, relnamespace, reltablespace, false active, array_fill(-1, ARRAY[$2+1]) size from pg_catalog.pg_class where oid >= $1 and relkind in ('r', 'm') union select i.oid, i.relowner, i.relnamespace, i.reltablespace, false, array_fill(-1, ARRAY[$2+1]) from pg_catalog.pg_index join pg_catalog.pg_class c on c.oid = indrelid join pg_catalog.pg_class i on i.oid = indexrelid where c.oid >= $1 and c.relkind in ('r', 'm') and i.oid >= $1 and i.relkind = 'i' union select relid, owneroid, namespaceoid, spcnode, false, array_fill(-1, ARRAY[$2+1]) from diskquota.show_relation_cache() where relid = primary_table_oid), t as (");
 
+	/*
+	 * On init stage, info from diskquota.table_size are added to invalidate them.
+	 */
 	append_active_tables(&sql, is_init);
 
 	appendStringInfoString(&sql, ") select coalesce(oid, tableid) oid, coalesce(relowner, 0) relowner, coalesce(relnamespace, 0) relnamespace, coalesce(reltablespace, 0) reltablespace, coalesce(active, true) active, coalesce(t.size, c.size) size from c full join t on tableid = oid");
+
 	/*
 	 * unset is_exist flag for tsentry in table_size_map this is used to
 	 * detect tables which have been dropped.
@@ -936,15 +954,6 @@ calculate_table_disk_usage(bool is_init)
 
 	if ((portal = SPI_cursor_open(NULL, plan, (Datum[]){ObjectIdGetDatum(FirstNormalObjectId), Int32GetDatum(SEGCOUNT)}, NULL, true)) == NULL)
 		ereport(ERROR, (errmsg("[diskquota] SPI_cursor_open(\"%s\") failed", sql.data)));
-
-	int16                      typlen;
-	bool                       typbyval;
-	char                       typalign;
-	get_typlenbyvalalign(INT8OID, &typlen, &typbyval, &typalign);
-
-	StringInfoData            active_oids;
-	int count       = 0;
-	initStringInfo(&active_oids);
 
 	do
 	{
@@ -992,9 +1001,9 @@ calculate_table_disk_usage(bool is_init)
 
 		if (tablesize[0] != -1)
 		{
-		appendStringInfo(&active_oids, "%d", relOid);
+		appendStringInfo(active_oids, "%d", relOid);
 
-		if (count++ > 0) appendStringInfo(&active_oids, ",");
+		if (count++ > 0) appendStringInfo(active_oids, ",");
 		}
 
 		/*
@@ -1142,8 +1151,6 @@ calculate_table_disk_usage(bool is_init)
 			}
 		}
 	}
-
-	return active_oids;
 }
 
 static void
@@ -1339,7 +1346,7 @@ flush_local_reject_map(void)
  * Dispatch rejectmap to segment servers.
  */
 static void
-dispatch_rejectmap(StringInfoData active_oids)
+dispatch_rejectmap(char *active_oids)
 {
 	HASH_SEQ_STATUS           hash_seq;
 	GlobalRejectMapEntry     *rejectmap_entry;
@@ -1368,7 +1375,7 @@ dispatch_rejectmap(StringInfoData active_oids)
 	                 "select diskquota.refresh_rejectmap("
 	                 "ARRAY[%s]::diskquota.rejectmap_entry[], "
 	                 "ARRAY[%s]::oid[])",
-	                 rows.data, active_oids.data);
+	                 rows.data, active_oids);
 	CdbDispatchCommand(sql.data, DF_NONE, &cdb_pgresults);
 
 	pfree(rows.data);
