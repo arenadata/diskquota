@@ -800,9 +800,9 @@ refresh_disk_quota_model(bool is_init)
 static void
 refresh_disk_quota_usage(bool is_init)
 {
-	bool  connected                   = false;
-	bool  pushed_active_snap          = false;
-	bool  ret                         = true;
+	bool           connected          = false;
+	bool           pushed_active_snap = false;
+	bool           ret                = true;
 	StringInfoData active_oids;
 
 	StartTransactionCommand();
@@ -831,7 +831,7 @@ refresh_disk_quota_usage(bool is_init)
 		 */
 		initStringInfo(&active_oids);
 		calculate_table_disk_usage(&active_oids, is_init);
-		bool hasActiveTable         = (active_oids.len > 0);
+		bool hasActiveTable = (active_oids.len > 0);
 		/* refresh quota_info_map */
 		refresh_quota_info_map();
 		/* flush local table_size_map to user table table_size */
@@ -869,19 +869,20 @@ refresh_disk_quota_usage(bool is_init)
 	return;
 }
 
-static Datum SPI_getbinval_my(HeapTuple tuple, TupleDesc tupdesc, const char *fname, bool allow_null, Oid typeid)
+static Datum
+SPI_getbinval_my(HeapTuple tuple, TupleDesc tupdesc, const char *fname, bool allow_null, Oid typeid)
 {
-    bool isnull;
-    Datum datum;
-    int fnumber = SPI_fnumber(tupdesc, fname);
-    if (SPI_gettypeid(tupdesc, fnumber) != typeid)
-		ereport(ERROR, (errcode(ERRCODE_MOST_SPECIFIC_TYPE_MISMATCH), errmsg("type of column \"%s\" must be \"%i\"", fname, typeid)));
-    datum = SPI_getbinval(tuple, tupdesc, fnumber, &isnull);
-    if (allow_null)
-		return datum;
-    if (isnull)
+	bool  isnull;
+	Datum datum;
+	int   fnumber = SPI_fnumber(tupdesc, fname);
+	if (SPI_gettypeid(tupdesc, fnumber) != typeid)
+		ereport(ERROR, (errcode(ERRCODE_MOST_SPECIFIC_TYPE_MISMATCH),
+		                errmsg("type of column \"%s\" must be \"%i\"", fname, typeid)));
+	datum = SPI_getbinval(tuple, tupdesc, fnumber, &isnull);
+	if (allow_null) return datum;
+	if (isnull)
 		ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("column \"%s\" must not be null", fname)));
-    return datum;
+	return datum;
 }
 
 /*
@@ -897,20 +898,20 @@ static Datum SPI_getbinval_my(HeapTuple tuple, TupleDesc tupdesc, const char *fn
 static void
 calculate_table_disk_usage(StringInfo active_oids, bool is_init)
 {
-	bool                      table_size_map_found;
-	int64                     updated_total_size;
-	TableSizeEntry           *tsentry = NULL;
-	HASH_SEQ_STATUS           iter;
-	TableSizeEntryKey         key;
-	int                       delete_entries_num = 0;
-	StringInfoData            delete_statement;
-	SPIPlanPtr plan;
-	Portal portal;
-	StringInfoData            sql;
-	int count       = 0;
-	int16                      typlen;
-	bool                       typbyval;
-	char                       typalign;
+	bool              table_size_map_found;
+	int64             updated_total_size;
+	TableSizeEntry   *tsentry = NULL;
+	HASH_SEQ_STATUS   iter;
+	TableSizeEntryKey key;
+	int               delete_entries_num = 0;
+	StringInfoData    delete_statement;
+	SPIPlanPtr        plan;
+	Portal            portal;
+	StringInfoData    sql;
+	int               count = 0;
+	int16             typlen;
+	bool              typbyval;
+	char              typalign;
 
 	get_typlenbyvalalign(INT8OID, &typlen, &typbyval, &typalign);
 
@@ -923,14 +924,26 @@ calculate_table_disk_usage(StringInfo active_oids, bool is_init)
 	 * Firstly the all the table which relkind is 'r'
 	 * or 'm' and not system table. Also, fetch the indexes of those tables.
 	 */
-	appendStringInfoString(&sql, "with c as (select oid, relowner, relnamespace, reltablespace, false active, array_fill(-1, ARRAY[$2+1]) size from pg_catalog.pg_class where oid >= $1 and relkind in ('r', 'm') union select i.oid, i.relowner, i.relnamespace, i.reltablespace, false, array_fill(-1, ARRAY[$2+1]) from pg_catalog.pg_index join pg_catalog.pg_class c on c.oid = indrelid join pg_catalog.pg_class i on i.oid = indexrelid where c.oid >= $1 and c.relkind in ('r', 'm') and i.oid >= $1 and i.relkind = 'i' union select relid, owneroid, namespaceoid, spcnode, false, array_fill(-1, ARRAY[$2+1]) from diskquota.show_relation_cache() where relid = primary_table_oid), t as (");
+	appendStringInfoString(
+	        &sql,
+	        "with c as (select oid, relowner, relnamespace, reltablespace, false active, array_fill(-1, ARRAY[$2+1]) "
+	        "size from pg_catalog.pg_class where oid >= $1 and relkind in ('r', 'm') union select i.oid, i.relowner, "
+	        "i.relnamespace, i.reltablespace, false, array_fill(-1, ARRAY[$2+1]) from pg_catalog.pg_index join "
+	        "pg_catalog.pg_class c on c.oid = indrelid join pg_catalog.pg_class i on i.oid = indexrelid where c.oid >= "
+	        "$1 and c.relkind in ('r', 'm') and i.oid >= $1 and i.relkind = 'i' union select relid, owneroid, "
+	        "namespaceoid, spcnode, false, array_fill(-1, ARRAY[$2+1]) from diskquota.show_relation_cache() where "
+	        "relid = primary_table_oid), t as (");
 
 	/*
 	 * On init stage, info from diskquota.table_size are added to invalidate them.
 	 */
 	append_active_tables(&sql, is_init);
 
-	appendStringInfoString(&sql, ") select coalesce(oid, tableid) oid, coalesce(relowner, 0) relowner, coalesce(relnamespace, 0) relnamespace, coalesce(reltablespace, 0) reltablespace, coalesce(active, true) active, coalesce(t.size, c.size) size from c full join t on tableid = oid");
+	appendStringInfoString(
+	        &sql,
+	        ") select coalesce(oid, tableid) oid, coalesce(relowner, 0) relowner, coalesce(relnamespace, 0) "
+	        "relnamespace, coalesce(reltablespace, 0) reltablespace, coalesce(active, true) active, coalesce(t.size, "
+	        "c.size) size from c full join t on tableid = oid");
 
 	/*
 	 * unset is_exist flag for tsentry in table_size_map this is used to
@@ -952,7 +965,8 @@ calculate_table_disk_usage(StringInfo active_oids, bool is_init)
 	if ((plan = SPI_prepare(sql.data, 2, (Oid[]){OIDOID, INT4OID})) == NULL)
 		ereport(ERROR, (errmsg("[diskquota] SPI_prepare(\"%s\") failed", sql.data)));
 
-	if ((portal = SPI_cursor_open(NULL, plan, (Datum[]){ObjectIdGetDatum(FirstNormalObjectId), Int32GetDatum(SEGCOUNT)}, NULL, true)) == NULL)
+	if ((portal = SPI_cursor_open(NULL, plan, (Datum[]){ObjectIdGetDatum(FirstNormalObjectId), Int32GetDatum(SEGCOUNT)},
+	                              NULL, true)) == NULL)
 		ereport(ERROR, (errmsg("[diskquota] SPI_cursor_open(\"%s\") failed", sql.data)));
 
 	do
@@ -961,16 +975,15 @@ calculate_table_disk_usage(StringInfo active_oids, bool is_init)
 		SPI_cursor_fetch(portal, true, 10000);
 		for (uint64 row = 0; row < SPI_processed; row++)
 		{
-			HeapTuple val = SPI_tuptable->vals[row];
-			TupleDesc tupdesc = SPI_tuptable->tupdesc;
-			Oid           relnamespace  = DatumGetObjectId(SPI_getbinval_my(val, tupdesc, "relnamespace", false, OIDOID));
-			Oid           relowner      = DatumGetObjectId(SPI_getbinval_my(val, tupdesc, "relowner", false, OIDOID));
-			Oid           reltablespace = DatumGetObjectId(SPI_getbinval_my(val, tupdesc, "reltablespace", false, OIDOID));
-       		Oid relOid = DatumGetObjectId(SPI_getbinval_my(val, tupdesc, "oid", false, OIDOID));
-       		bool active = DatumGetBool(SPI_getbinval_my(val, tupdesc, "active", false, BOOLOID));
+			HeapTuple val           = SPI_tuptable->vals[row];
+			TupleDesc tupdesc       = SPI_tuptable->tupdesc;
+			Oid       relnamespace  = DatumGetObjectId(SPI_getbinval_my(val, tupdesc, "relnamespace", false, OIDOID));
+			Oid       relowner      = DatumGetObjectId(SPI_getbinval_my(val, tupdesc, "relowner", false, OIDOID));
+			Oid       reltablespace = DatumGetObjectId(SPI_getbinval_my(val, tupdesc, "reltablespace", false, OIDOID));
+			Oid       relOid        = DatumGetObjectId(SPI_getbinval_my(val, tupdesc, "oid", false, OIDOID));
+			bool      active        = DatumGetBool(SPI_getbinval_my(val, tupdesc, "active", false, BOOLOID));
 
-			if (!OidIsValid(reltablespace))
-				reltablespace = MyDatabaseTableSpace;
+			if (!OidIsValid(reltablespace)) reltablespace = MyDatabaseTableSpace;
 
 			if (is_init && active)
 			{
@@ -991,132 +1004,131 @@ calculate_table_disk_usage(StringInfo active_oids, bool is_init)
 				continue;
 			}
 
-			Datum	   *sizes;
-			int			nelems;
+			Datum     *sizes;
+			int        nelems;
 			ArrayType *array = DatumGetArrayTypeP(SPI_getbinval_my(val, tupdesc, "size", false, INT8ARRAYOID));
 			deconstruct_array(array, INT8OID, typlen, typbyval, typalign, &sizes, NULL, &nelems);
 			Size *tablesize = palloc(nelems * sizeof(*tablesize));
-                       for (int j = 0; j < nelems; j++)
-                               tablesize[j] = DatumGetInt64(sizes[j]);
+			for (int j = 0; j < nelems; j++) tablesize[j] = DatumGetInt64(sizes[j]);
 
-		if (tablesize[0] != -1)
-		{
-		appendStringInfo(active_oids, "%d", relOid);
-
-		if (count++ > 0) appendStringInfo(active_oids, ",");
-		}
-
-		/*
-		 * The segid is the same as the content id in gp_segment_configuration
-		 * and the content id is continuous, so it's safe to use SEGCOUNT
-		 * to get segid.
-		 */
-		for (int cur_segid = -1; cur_segid < SEGCOUNT; cur_segid++)
-		{
-			key.reloid = relOid;
-			key.id     = TableSizeEntryId(cur_segid);
-
-			HASHACTION action = check_hash_fullness(table_size_map, MAX_NUM_TABLE_SIZE_ENTRIES, table_size_map_warning,
-			                                        table_size_map_last_overflow_report);
-			tsentry           = hash_search(table_size_map, &key, action, &table_size_map_found);
-
-			if (!table_size_map_found)
-			{
-				if (tsentry == NULL)
-				{
-					/* Too many tables have been added to the table_size_map, to avoid diskquota using
-					   too much share memory, just quit the loop. The diskquota won't work correctly
-					   anymore. */
-					break;
-				}
-
-				tsentry->key.reloid = relOid;
-				tsentry->key.id     = key.id;
-				Assert(TableSizeEntrySegidStart(tsentry) == cur_segid);
-				memset(tsentry->totalsize, 0, sizeof(tsentry->totalsize));
-				tsentry->owneroid      = InvalidOid;
-				tsentry->namespaceoid  = InvalidOid;
-				tsentry->tablespaceoid = InvalidOid;
-				tsentry->flag          = 0;
-
-				int seg_st = TableSizeEntrySegidStart(tsentry);
-				int seg_ed = TableSizeEntrySegidEnd(tsentry);
-				for (int j = seg_st; j < seg_ed; j++) TableSizeEntrySetFlushFlag(tsentry, j);
-			}
-
-			/* mark tsentry is_exist */
-			if (tsentry) set_table_size_entry_flag(tsentry, TABLE_EXIST);
-
-			/* skip to recalculate the tables which are not in active list */
 			if (tablesize[0] != -1)
 			{
-				if (cur_segid == -1)
+				appendStringInfo(active_oids, "%d", relOid);
+
+				if (count++ > 0) appendStringInfo(active_oids, ",");
+			}
+
+			/*
+			 * The segid is the same as the content id in gp_segment_configuration
+			 * and the content id is continuous, so it's safe to use SEGCOUNT
+			 * to get segid.
+			 */
+			for (int cur_segid = -1; cur_segid < SEGCOUNT; cur_segid++)
+			{
+				key.reloid = relOid;
+				key.id     = TableSizeEntryId(cur_segid);
+
+				HASHACTION action = check_hash_fullness(table_size_map, MAX_NUM_TABLE_SIZE_ENTRIES,
+				                                        table_size_map_warning, table_size_map_last_overflow_report);
+				tsentry           = hash_search(table_size_map, &key, action, &table_size_map_found);
+
+				if (!table_size_map_found)
 				{
-					/* pretend process as utility mode, and append the table size on master */
-					Gp_role = GP_ROLE_UTILITY;
+					if (tsentry == NULL)
+					{
+						/* Too many tables have been added to the table_size_map, to avoid diskquota using
+						   too much share memory, just quit the loop. The diskquota won't work correctly
+						   anymore. */
+						break;
+					}
 
-					/* when cur_segid is -1, the tablesize is the sum of tablesize of master and all segments */
-					tablesize[0] += calculate_table_size(relOid);
+					tsentry->key.reloid = relOid;
+					tsentry->key.id     = key.id;
+					Assert(TableSizeEntrySegidStart(tsentry) == cur_segid);
+					memset(tsentry->totalsize, 0, sizeof(tsentry->totalsize));
+					tsentry->owneroid      = InvalidOid;
+					tsentry->namespaceoid  = InvalidOid;
+					tsentry->tablespaceoid = InvalidOid;
+					tsentry->flag          = 0;
 
-					Gp_role = GP_ROLE_DISPATCH;
+					int seg_st = TableSizeEntrySegidStart(tsentry);
+					int seg_ed = TableSizeEntrySegidEnd(tsentry);
+					for (int j = seg_st; j < seg_ed; j++) TableSizeEntrySetFlushFlag(tsentry, j);
 				}
-				/* firstly calculate the updated total size of a table */
-				updated_total_size =
-				        tablesize[cur_segid + 1] - TableSizeEntryGetSize(tsentry, cur_segid);
 
-				/* update the table_size entry */
-				TableSizeEntrySetSize(tsentry, cur_segid, tablesize[cur_segid + 1]);
-				TableSizeEntrySetFlushFlag(tsentry, cur_segid);
+				/* mark tsentry is_exist */
+				if (tsentry) set_table_size_entry_flag(tsentry, TABLE_EXIST);
 
-				/* update the disk usage, there may be entries in the map whose keys are InvlidOid as the tsentry does
-				 * not exist in the table_size_map */
-				update_size_for_quota(updated_total_size, NAMESPACE_QUOTA, (Oid[]){tsentry->namespaceoid}, cur_segid);
-				update_size_for_quota(updated_total_size, ROLE_QUOTA, (Oid[]){tsentry->owneroid}, cur_segid);
-				update_size_for_quota(updated_total_size, ROLE_TABLESPACE_QUOTA,
-				                      (Oid[]){tsentry->owneroid, tsentry->tablespaceoid}, cur_segid);
-				update_size_for_quota(updated_total_size, NAMESPACE_TABLESPACE_QUOTA,
-				                      (Oid[]){tsentry->namespaceoid, tsentry->tablespaceoid}, cur_segid);
-			}
-			/* table size info doesn't need to flush at init quota model stage */
-			if (is_init)
-			{
-				TableSizeEntryResetFlushFlag(tsentry, cur_segid);
-			}
+				/* skip to recalculate the tables which are not in active list */
+				if (tablesize[0] != -1)
+				{
+					if (cur_segid == -1)
+					{
+						/* pretend process as utility mode, and append the table size on master */
+						Gp_role = GP_ROLE_UTILITY;
 
-			/* if schema change, transfer the file size */
-			if (tsentry->namespaceoid != relnamespace)
-			{
-				transfer_table_for_quota(TableSizeEntryGetSize(tsentry, cur_segid), NAMESPACE_QUOTA,
-				                         (Oid[]){tsentry->namespaceoid}, (Oid[]){relnamespace}, cur_segid);
-			}
-			/* if owner change, transfer the file size */
-			if (tsentry->owneroid != relowner)
-			{
-				transfer_table_for_quota(TableSizeEntryGetSize(tsentry, cur_segid), ROLE_QUOTA,
-				                         (Oid[]){tsentry->owneroid}, (Oid[]){relowner}, cur_segid);
-			}
+						/* when cur_segid is -1, the tablesize is the sum of tablesize of master and all segments */
+						tablesize[0] += calculate_table_size(relOid);
 
-			if (tsentry->tablespaceoid != reltablespace || tsentry->namespaceoid != relnamespace)
-			{
-				transfer_table_for_quota(TableSizeEntryGetSize(tsentry, cur_segid), NAMESPACE_TABLESPACE_QUOTA,
-				                         (Oid[]){tsentry->namespaceoid, tsentry->tablespaceoid},
-				                         (Oid[]){relnamespace, reltablespace}, cur_segid);
-			}
-			if (tsentry->tablespaceoid != reltablespace || tsentry->owneroid != relowner)
-			{
-				transfer_table_for_quota(TableSizeEntryGetSize(tsentry, cur_segid), ROLE_TABLESPACE_QUOTA,
-				                         (Oid[]){tsentry->owneroid, tsentry->tablespaceoid},
-				                         (Oid[]){relowner, reltablespace}, cur_segid);
-			}
+						Gp_role = GP_ROLE_DISPATCH;
+					}
+					/* firstly calculate the updated total size of a table */
+					updated_total_size = tablesize[cur_segid + 1] - TableSizeEntryGetSize(tsentry, cur_segid);
 
-			if (cur_segid == (TableSizeEntrySegidEnd(tsentry) - 1))
-			{
-				tsentry->namespaceoid  = relnamespace;
-				tsentry->owneroid      = relowner;
-				tsentry->tablespaceoid = reltablespace;
+					/* update the table_size entry */
+					TableSizeEntrySetSize(tsentry, cur_segid, tablesize[cur_segid + 1]);
+					TableSizeEntrySetFlushFlag(tsentry, cur_segid);
+
+					/* update the disk usage, there may be entries in the map whose keys are InvlidOid as the tsentry
+					 * does not exist in the table_size_map */
+					update_size_for_quota(updated_total_size, NAMESPACE_QUOTA, (Oid[]){tsentry->namespaceoid},
+					                      cur_segid);
+					update_size_for_quota(updated_total_size, ROLE_QUOTA, (Oid[]){tsentry->owneroid}, cur_segid);
+					update_size_for_quota(updated_total_size, ROLE_TABLESPACE_QUOTA,
+					                      (Oid[]){tsentry->owneroid, tsentry->tablespaceoid}, cur_segid);
+					update_size_for_quota(updated_total_size, NAMESPACE_TABLESPACE_QUOTA,
+					                      (Oid[]){tsentry->namespaceoid, tsentry->tablespaceoid}, cur_segid);
+				}
+				/* table size info doesn't need to flush at init quota model stage */
+				if (is_init)
+				{
+					TableSizeEntryResetFlushFlag(tsentry, cur_segid);
+				}
+
+				/* if schema change, transfer the file size */
+				if (tsentry->namespaceoid != relnamespace)
+				{
+					transfer_table_for_quota(TableSizeEntryGetSize(tsentry, cur_segid), NAMESPACE_QUOTA,
+					                         (Oid[]){tsentry->namespaceoid}, (Oid[]){relnamespace}, cur_segid);
+				}
+				/* if owner change, transfer the file size */
+				if (tsentry->owneroid != relowner)
+				{
+					transfer_table_for_quota(TableSizeEntryGetSize(tsentry, cur_segid), ROLE_QUOTA,
+					                         (Oid[]){tsentry->owneroid}, (Oid[]){relowner}, cur_segid);
+				}
+
+				if (tsentry->tablespaceoid != reltablespace || tsentry->namespaceoid != relnamespace)
+				{
+					transfer_table_for_quota(TableSizeEntryGetSize(tsentry, cur_segid), NAMESPACE_TABLESPACE_QUOTA,
+					                         (Oid[]){tsentry->namespaceoid, tsentry->tablespaceoid},
+					                         (Oid[]){relnamespace, reltablespace}, cur_segid);
+				}
+				if (tsentry->tablespaceoid != reltablespace || tsentry->owneroid != relowner)
+				{
+					transfer_table_for_quota(TableSizeEntryGetSize(tsentry, cur_segid), ROLE_TABLESPACE_QUOTA,
+					                         (Oid[]){tsentry->owneroid, tsentry->tablespaceoid},
+					                         (Oid[]){relowner, reltablespace}, cur_segid);
+				}
+
+				if (cur_segid == (TableSizeEntrySegidEnd(tsentry) - 1))
+				{
+					tsentry->namespaceoid  = relnamespace;
+					tsentry->owneroid      = relowner;
+					tsentry->tablespaceoid = reltablespace;
+				}
 			}
-		}
-		pfree(tablesize);
+			pfree(tablesize);
 		}
 	} while (SPI_processed);
 
@@ -1348,12 +1360,12 @@ flush_local_reject_map(void)
 static void
 dispatch_rejectmap(char *active_oids)
 {
-	HASH_SEQ_STATUS           hash_seq;
-	GlobalRejectMapEntry     *rejectmap_entry;
-	int                       num_entries, count = 0;
-	CdbPgResults              cdb_pgresults = {NULL, 0};
-	StringInfoData            rows;
-	StringInfoData            sql;
+	HASH_SEQ_STATUS       hash_seq;
+	GlobalRejectMapEntry *rejectmap_entry;
+	int                   num_entries, count = 0;
+	CdbPgResults          cdb_pgresults = {NULL, 0};
+	StringInfoData        rows;
+	StringInfoData        sql;
 
 	initStringInfo(&rows);
 	initStringInfo(&sql);
