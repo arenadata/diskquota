@@ -919,31 +919,41 @@ calculate_table_disk_usage(StringInfo active_oids, bool is_init)
 	initStringInfo(&delete_statement);
 
 	/*
-	 * Get info of the tables which diskquota
-	 * needs to care about in the database.
-	 * Firstly the all the table which relkind is 'r'
-	 * or 'm' and not system table. Also, fetch the indexes of those tables.
+	 * Get info of the tables which diskquota needs to care about in the database.
+	 * Firstly the all the table which relkind is 'r' or 'm' and not system table.
+	 * Also, fetch the indexes of those tables.
 	 */
 	appendStringInfoString(
 	        &sql,
-	        "with c as (select oid, relowner, relnamespace, reltablespace, false active, array_fill(-1, ARRAY[$2+1]) "
-	        "size from pg_catalog.pg_class where oid >= $1 and relkind in ('r', 'm') union select i.oid, i.relowner, "
-	        "i.relnamespace, i.reltablespace, false, array_fill(-1, ARRAY[$2+1]) from pg_catalog.pg_index join "
-	        "pg_catalog.pg_class c on c.oid = indrelid join pg_catalog.pg_class i on i.oid = indexrelid where c.oid >= "
-	        "$1 and c.relkind in ('r', 'm') and i.oid >= $1 and i.relkind = 'i' union select relid, owneroid, "
-	        "namespaceoid, spcnode, false, array_fill(-1, ARRAY[$2+1]) from diskquota.show_relation_cache() where "
-	        "relid = primary_table_oid), t as (");
+	        "with c as ( "
+	        "	select oid, relowner, relnamespace, reltablespace, false active, array_fill(-1, ARRAY[$2+1]) size "
+	        "		from pg_catalog.pg_class where oid >= $1 and relkind in ('r', 'm') "
+	        "	union "
+	        "	select i.oid, i.relowner, i.relnamespace, i.reltablespace, false, array_fill(-1, ARRAY[$2+1]) "
+	        "		from pg_catalog.pg_index "
+	        "		join pg_catalog.pg_class c on c.oid = indrelid "
+	        "		join pg_catalog.pg_class i on i.oid = indexrelid "
+	        "	where c.oid >= $1 and c.relkind in ('r', 'm') and i.oid >= $1 and i.relkind = 'i' "
+	        "	union "
+	        "	select relid, owneroid, namespaceoid, spcnode, false, array_fill(-1, ARRAY[$2+1]) "
+	        "		from diskquota.show_relation_cache() "
+	        "	where relid = primary_table_oid "
+	        "), t as (");
 
 	/*
 	 * On init stage, info from diskquota.table_size are added to invalidate them.
 	 */
 	append_active_tables(&sql, is_init);
 
-	appendStringInfoString(
-	        &sql,
-	        ") select coalesce(oid, tableid) oid, coalesce(relowner, 0) relowner, coalesce(relnamespace, 0) "
-	        "relnamespace, coalesce(reltablespace, 0) reltablespace, coalesce(active, true) active, coalesce(t.size, "
-	        "c.size) size from c full join t on tableid = oid");
+	appendStringInfoString(&sql,
+	                       ") select "
+	                       "	coalesce(oid, tableid) oid, "
+	                       "	coalesce(relowner, 0) relowner, "
+	                       "	coalesce(relnamespace, 0) relnamespace, "
+	                       "	coalesce(reltablespace, 0) reltablespace, "
+	                       "	coalesce(active, true) active, "
+	                       "	coalesce(t.size, c.size) size "
+	                       "from c full join t on tableid = oid");
 
 	/*
 	 * unset is_exist flag for tsentry in table_size_map this is used to

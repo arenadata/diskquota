@@ -420,10 +420,13 @@ append_active_tables(StringInfo sql, bool is_init)
 
 		cdbdisp_clearCdbPgResults(&cdb_pgresults);
 
-		appendStringInfo(sql,
-		                 "}'::oid[])).* from gp_dist_random('gp_id')) select \"TABLE_OID\" tableid, "
-		                 "array[sum(\"TABLE_SIZE\")::bigint] || array_agg(\"TABLE_SIZE\" order by \"GP_SEGMENT_ID\") "
-		                 "size from s group by 1");
+		appendStringInfo(
+		        sql,
+		        "}'::oid[])).* from gp_dist_random('gp_id') "
+		        ") select "
+		        "	\"TABLE_OID\" tableid, "
+		        "	array[sum(\"TABLE_SIZE\")::bigint] || array_agg(\"TABLE_SIZE\" order by \"GP_SEGMENT_ID\") size "
+		        "from s group by 1");
 	}
 }
 
