@@ -897,11 +897,9 @@ static StringInfoData
 calculate_table_disk_usage(bool is_init)
 {
 	bool                      table_size_map_found;
-	bool                      active_tbl_found;
 	int64                     updated_total_size;
 	TableSizeEntry           *tsentry = NULL;
 	HASH_SEQ_STATUS           iter;
-	ActiveTableEntryCombined *active_table_entry;
 	TableSizeEntryKey         key;
 	int                       delete_entries_num = 0;
 	StringInfoData            delete_statement;
@@ -909,16 +907,13 @@ calculate_table_disk_usage(bool is_init)
 	Portal portal;
 	StringInfoData            sql;
 	initStringInfo(&sql);
-
-	if (is_init)
-		appendStringInfoString(&sql, "with c as (");
-
-	appendStringInfoString(&sql, "select oid, relowner, relnamespace, reltablespace, false active, array_fill(-1, ARRAY[$2+1]) size from pg_catalog.pg_class where oid >= $1 and relkind in ('r', 'm') union select i.oid, i.relowner, i.relnamespace, i.reltablespace, false, array_fill(-1, ARRAY[$2+1]) from pg_catalog.pg_index join pg_catalog.pg_class c on c.oid = indrelid join pg_catalog.pg_class i on i.oid = indexrelid where c.oid >= $1 and c.relkind in ('r', 'm') and i.oid >= $1 and i.relkind = 'i' union select relid, owneroid, namespaceoid, spcnode, false, array_fill(-1, ARRAY[$2+1]) from diskquota.show_relation_cache() where relid = primary_table_oid");
-
 	initStringInfo(&delete_statement);
 
-	HTAB *local_active_table_stat_map = gp_fetch_active_tables(is_init);
+	appendStringInfoString(&sql, "with c as (select oid, relowner, relnamespace, reltablespace, false active, array_fill(-1, ARRAY[$2+1]) size from pg_catalog.pg_class where oid >= $1 and relkind in ('r', 'm') union select i.oid, i.relowner, i.relnamespace, i.reltablespace, false, array_fill(-1, ARRAY[$2+1]) from pg_catalog.pg_index join pg_catalog.pg_class c on c.oid = indrelid join pg_catalog.pg_class i on i.oid = indexrelid where c.oid >= $1 and c.relkind in ('r', 'm') and i.oid >= $1 and i.relkind = 'i' union select relid, owneroid, namespaceoid, spcnode, false, array_fill(-1, ARRAY[$2+1]) from diskquota.show_relation_cache() where relid = primary_table_oid), t as (");
 
+	gp_fetch_active_tables(&sql, is_init);
+
+	appendStringInfoString(&sql, ") select coalesce(oid, tableid) oid, coalesce(relowner, 0) relowner, coalesce(relnamespace, 0) relnamespace, coalesce(reltablespace, 0) reltablespace, coalesce(active, true) active, coalesce(t.size, c.size) size from c full join t on tableid = oid");
 	/*
 	 * unset is_exist flag for tsentry in table_size_map this is used to
 	 * detect tables which have been dropped.
@@ -935,8 +930,6 @@ calculate_table_disk_usage(bool is_init)
 	 * calculate the file size for active table and update namespace_size_map
 	 * and role_size_map
 	 */
-	if (is_init)
-		appendStringInfoString(&sql, "), t as (select tableid, array_agg(size order by segid) size from diskquota.table_size group by 1) select coalesce(oid, tableid) oid, coalesce(relowner, 0) relowner, coalesce(relnamespace, 0) relnamespace, coalesce(reltablespace, 0) reltablespace, coalesce(active, true) active, coalesce(t.size, c.size) size from c full join t on tableid = oid");
 
 	if ((plan = SPI_prepare(sql.data, 2, (Oid[]){OIDOID, INT4OID})) == NULL)
 		ereport(ERROR, (errmsg("[diskquota] SPI_prepare(\"%s\") failed", sql.data)));
@@ -948,6 +941,10 @@ calculate_table_disk_usage(bool is_init)
 	bool                       typbyval;
 	char                       typalign;
 	get_typlenbyvalalign(INT8OID, &typlen, &typbyval, &typalign);
+
+	StringInfoData            active_oids;
+	int count       = 0;
+	initStringInfo(&active_oids);
 
 	do
 	{
@@ -989,6 +986,16 @@ calculate_table_disk_usage(bool is_init)
 			int			nelems;
 			ArrayType *array = DatumGetArrayTypeP(SPI_getbinval_my(val, tupdesc, "size", false, INT8ARRAYOID));
 			deconstruct_array(array, INT8OID, typlen, typbyval, typalign, &sizes, NULL, &nelems);
+			Size *tablesize = palloc(nelems * sizeof(*tablesize));
+                       for (int j = 0; j < nelems; j++)
+                               tablesize[j] = DatumGetInt64(sizes[j]);
+
+		if (tablesize[0] != -1)
+		{
+		appendStringInfo(&active_oids, "%d", relOid);
+
+		if (count++ > 0) appendStringInfo(&active_oids, ",");
+		}
 
 		/*
 		 * The segid is the same as the content id in gp_segment_configuration
@@ -1030,11 +1037,9 @@ calculate_table_disk_usage(bool is_init)
 
 			/* mark tsentry is_exist */
 			if (tsentry) set_table_size_entry_flag(tsentry, TABLE_EXIST);
-			active_table_entry = (ActiveTableEntryCombined *)hash_search(local_active_table_stat_map, &relOid,
-			                                                             HASH_FIND, &active_tbl_found);
 
 			/* skip to recalculate the tables which are not in active list */
-			if (active_tbl_found)
+			if (tablesize[0] != -1)
 			{
 				if (cur_segid == -1)
 				{
@@ -1042,16 +1047,16 @@ calculate_table_disk_usage(bool is_init)
 					Gp_role = GP_ROLE_UTILITY;
 
 					/* when cur_segid is -1, the tablesize is the sum of tablesize of master and all segments */
-					active_table_entry->tablesize[0] += calculate_table_size(relOid);
+					tablesize[0] += calculate_table_size(relOid);
 
 					Gp_role = GP_ROLE_DISPATCH;
 				}
 				/* firstly calculate the updated total size of a table */
 				updated_total_size =
-				        active_table_entry->tablesize[cur_segid + 1] - TableSizeEntryGetSize(tsentry, cur_segid);
+				        tablesize[cur_segid + 1] - TableSizeEntryGetSize(tsentry, cur_segid);
 
 				/* update the table_size entry */
-				TableSizeEntrySetSize(tsentry, cur_segid, active_table_entry->tablesize[cur_segid + 1]);
+				TableSizeEntrySetSize(tsentry, cur_segid, tablesize[cur_segid + 1]);
 				TableSizeEntrySetFlushFlag(tsentry, cur_segid);
 
 				/* update the disk usage, there may be entries in the map whose keys are InvlidOid as the tsentry does
@@ -1102,6 +1107,7 @@ calculate_table_disk_usage(bool is_init)
 				tsentry->tablespaceoid = reltablespace;
 			}
 		}
+		pfree(tablesize);
 		}
 	} while (SPI_processed);
 
@@ -1137,18 +1143,6 @@ calculate_table_disk_usage(bool is_init)
 		}
 	}
 
-	HASH_SEQ_STATUS           hash_seq;
-	StringInfoData            active_oids;
-	int count       = 0;
-	int num_entries = hash_get_num_entries(local_active_table_stat_map);
-	initStringInfo(&active_oids);
-	hash_seq_init(&hash_seq, local_active_table_stat_map);
-	while ((active_table_entry = hash_seq_search(&hash_seq)) != NULL)
-	{
-		appendStringInfo(&active_oids, "%d", active_table_entry->reloid);
-
-		if (++count != num_entries) appendStringInfo(&active_oids, ",");
-	}
 	return active_oids;
 }
 

@@ -87,8 +87,8 @@ static void object_access_hook_QuotaStmt(ObjectAccessType access, Oid classId, O
 
 static HTAB          *get_active_tables_stats(ArrayType *array);
 static HTAB          *get_active_tables_oid(void);
-static char          *pull_active_list_from_seg(void);
-static void           load_table_size(HTAB *local_table_stats_map, bool is_init);
+static void           pull_active_list_from_seg(StringInfo sql);
+static void           load_table_size(StringInfo sql, bool is_init);
 static void           report_active_table_helper(const RelFileNodeBackend *relFileNode);
 static void           remove_from_active_table_map(const RelFileNodeBackend *relFileNode);
 static void           report_relation_cache_helper(Oid relid);
@@ -98,7 +98,7 @@ static Oid            get_dbid(ArrayType *array);
 void  init_active_table_hook(void);
 void  init_shm_worker_active_tables(void);
 void  init_lock_active_tables(void);
-HTAB *gp_fetch_active_tables(bool is_init);
+// void  gp_fetch_active_tables(StringInfo sql, bool is_init);
 
 /*
  * Init active_tables_map shared memory
@@ -361,25 +361,10 @@ remove_from_active_table_map(const RelFileNodeBackend *relFileNode)
  * And aggregate the table size on each segment
  * to get the real table size at cluster level.
  */
-HTAB *
-gp_fetch_active_tables(bool is_init)
+void
+gp_fetch_active_tables(StringInfo sql, bool is_init)
 {
-	HTAB          *local_table_stats_map = NULL;
-	HASHCTL        ctl;
-
-	Assert(Gp_role == GP_ROLE_DISPATCH);
-
-	memset(&ctl, 0, sizeof(ctl));
-	ctl.keysize   = sizeof(Oid);
-	ctl.entrysize = sizeof(ActiveTableEntryCombined) + SEGCOUNT * sizeof(Size);
-	ctl.hcxt      = CurrentMemoryContext;
-
-	local_table_stats_map = diskquota_hash_create("local active table map with relfilenode info", 1024, &ctl,
-	                                              HASH_ELEM | HASH_CONTEXT, DISKQUOTA_OID_HASH);
-
-	load_table_size(local_table_stats_map, is_init);
-
-	return local_table_stats_map;
+	load_table_size(sql, is_init);
 }
 
 /*
@@ -923,100 +908,12 @@ get_active_tables_oid(void)
  * and other shared memory will be warmed up by table_size table.
  */
 static void
-load_table_size(HTAB *local_table_stats_map, bool is_init)
+load_table_size(StringInfo sql, bool is_init)
 {
-	TupleDesc                 tupdesc;
-	int                       i;
-	bool                      found;
-	ActiveTableEntryCombined *quota_entry;
-	SPIPlanPtr                plan;
-	Portal                    portal;
-	char *sql = "select tableid, array_agg(size order by segid) size from diskquota.table_size group by 1";
-
-	if (!is_init)
-		sql             = pull_active_list_from_seg();
-
-	if ((plan = SPI_prepare(sql, 0, NULL)) == NULL)
-		ereport(ERROR, (errmsg("[diskquota] SPI_prepare(\"%s\") failed", sql)));
-	if ((portal = SPI_cursor_open(NULL, plan, NULL, NULL, true)) == NULL)
-		ereport(ERROR, (errmsg("[diskquota] SPI_cursor_open(\"%s\") failed", sql)));
-
-	if (!is_init)
-		pfree(sql);
-
-	SPI_cursor_fetch(portal, true, 1000);
-
-	if (SPI_tuptable == NULL)
-	{
-		ereport(ERROR, (errmsg("[diskquota] load_table_size SPI_cursor_fetch failed")));
-	}
-
-	tupdesc = SPI_tuptable->tupdesc;
-#if GP_VERSION_NUM < 70000
-	if (tupdesc->natts != 2 || ((tupdesc)->attrs[0])->atttypid != OIDOID ||
-	    ((tupdesc)->attrs[1])->atttypid != INT8ARRAYOID)
-#else
-	if (tupdesc->natts != 2 || ((tupdesc)->attrs[0]).atttypid != OIDOID || ((tupdesc)->attrs[1]).atttypid != INT8ARRAYOID)
-#endif /* GP_VERSION_NUM */
-	{
-		if (tupdesc->natts != 2)
-		{
-			ereport(WARNING, (errmsg("[diskquota] tupdesc->natts: %d", tupdesc->natts)));
-		}
-		else
-		{
-#if GP_VERSION_NUM < 70000
-			ereport(WARNING, (errmsg("[diskquota] attrs: %d, %d", tupdesc->attrs[0]->atttypid,
-			                         tupdesc->attrs[1]->atttypid)));
-#else
-			ereport(WARNING, (errmsg("[diskquota] attrs: %d, %d", tupdesc->attrs[0].atttypid,
-			                         tupdesc->attrs[1].atttypid)));
-#endif /* GP_VERSION_NUM */
-		}
-		ereport(ERROR, (errmsg("[diskquota] table \"table_size\" is corrupted in database \"%s\","
-		                       " please recreate diskquota extension",
-		                       get_database_name(MyDatabaseId))));
-	}
-
-	int16                      typlen;
-	bool                       typbyval;
-	char                       typalign;
-	get_typlenbyvalalign(INT8OID, &typlen, &typbyval, &typalign);
-
-	while (SPI_processed > 0)
-	{
-		/* push the table oid and size into local_table_stats_map */
-		for (i = 0; i < SPI_processed; i++)
-		{
-			HeapTuple tup = SPI_tuptable->vals[i];
-			Datum     dat;
-			Datum	   *sizes;
-			Oid       reloid;
-			bool      isnull;
-			int			nelems;
-
-			dat = SPI_getbinval(tup, tupdesc, 1, &isnull);
-			if (isnull) continue;
-			reloid = DatumGetObjectId(dat);
-
-			dat = SPI_getbinval(tup, tupdesc, 2, &isnull);
-			if (isnull) continue;
-
-			quota_entry = (ActiveTableEntryCombined *)hash_search(local_table_stats_map, &reloid, HASH_ENTER, &found);
-			quota_entry->reloid               = reloid;
-
-			deconstruct_array(DatumGetArrayTypeP(dat), INT8OID, typlen, typbyval, typalign, &sizes, NULL, &nelems);
-			for (int j = 0; j < nelems; j++)
-				quota_entry->tablesize[j] = DatumGetInt64(sizes[j]);
-			pfree(sizes);
-		}
-		SPI_freetuptable(SPI_tuptable);
-		SPI_cursor_fetch(portal, true, 1000);
-	}
-
-	SPI_freetuptable(SPI_tuptable);
-	SPI_cursor_close(portal);
-	SPI_freeplan(plan);
+	if (is_init)
+		appendStringInfoString(sql, "select tableid, array_agg(size order by segid) size from diskquota.table_size group by 1");
+	else
+		pull_active_list_from_seg(sql);
 }
 
 /*
@@ -1025,23 +922,18 @@ load_table_size(HTAB *local_table_stats_map, bool is_init)
  * Function diskquota_fetch_table_stat is called to calculate
  * the table size on the fly.
  */
-static char *
-pull_active_list_from_seg(void)
+static void
+pull_active_list_from_seg(StringInfo sql)
 {
 	CdbPgResults               cdb_pgresults = {NULL, 0};
 	int                        i, j;
-	char                      *sql                        = NULL;
-	StringInfoData             buffer;
 	uint32                     count  = 0;
 
-	initStringInfo(&buffer);
-	appendStringInfo(&buffer, "with s as (select (diskquota.diskquota_fetch_table_stat(1, '{");
+	appendStringInfo(sql, "with s as (select (diskquota.diskquota_fetch_table_stat(1, '{");
 
 	/* first get all oid of tables which are active table on any segment */
-	sql = "select * from diskquota.diskquota_fetch_table_stat(0, '{}'::oid[])";
-
 	/* any errors will be catch in upper level */
-	CdbDispatchCommand(sql, DF_NONE, &cdb_pgresults);
+	CdbDispatchCommand("select * from diskquota.diskquota_fetch_table_stat(0, '{}'::oid[])", DF_NONE, &cdb_pgresults);
 	for (i = 0; i < cdb_pgresults.numResults; i++)
 	{
 		PGresult *pgresult = cdb_pgresults.pg_results[i];
@@ -1057,13 +949,11 @@ pull_active_list_from_seg(void)
 		for (j = 0; j < PQntuples(pgresult); j++)
 		{
 			if (count++ > 0)
-				appendStringInfoString(&buffer, ",");
-			appendStringInfoString(&buffer, PQgetvalue(pgresult, j, 0));
+				appendStringInfoString(sql, ",");
+			appendStringInfoString(sql, PQgetvalue(pgresult, j, 0));
 		}
 	}
 	cdbdisp_clearCdbPgResults(&cdb_pgresults);
 
-	appendStringInfo(&buffer, "}'::oid[])).* from gp_dist_random('gp_id')) select \"TABLE_OID\" tableid, array[sum(\"TABLE_SIZE\")] || array_agg(\"TABLE_SIZE\" order by \"GP_SEGMENT_ID\") size from s group by 1");
-
-	return buffer.data;
+	appendStringInfo(sql, "}'::oid[])).* from gp_dist_random('gp_id')) select \"TABLE_OID\" tableid, array[sum(\"TABLE_SIZE\")] || array_agg(\"TABLE_SIZE\" order by \"GP_SEGMENT_ID\") size from s group by 1");
 }
