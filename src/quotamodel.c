@@ -913,7 +913,7 @@ calculate_table_disk_usage(bool is_init)
 	if (is_init)
 		appendStringInfoString(&sql, "with c as (");
 
-	appendStringInfoString(&sql, "select oid, relowner, relnamespace, reltablespace, false as active from pg_catalog.pg_class where oid >= $1 and relkind in ('r', 'm') union select i.oid, i.relowner, i.relnamespace, i.reltablespace, false from pg_catalog.pg_index join pg_catalog.pg_class c on c.oid = indrelid join pg_catalog.pg_class i on i.oid = indexrelid where c.oid >= $1 and c.relkind in ('r', 'm') and i.oid >= $1 and i.relkind = 'i' union select relid, owneroid, namespaceoid, spcnode, false from diskquota.show_relation_cache() where relid = primary_table_oid");
+	appendStringInfoString(&sql, "select oid, relowner, relnamespace, reltablespace, false active, array_fill(-1, ARRAY[$2+1]) size from pg_catalog.pg_class where oid >= $1 and relkind in ('r', 'm') union select i.oid, i.relowner, i.relnamespace, i.reltablespace, false, array_fill(-1, ARRAY[$2+1]) from pg_catalog.pg_index join pg_catalog.pg_class c on c.oid = indrelid join pg_catalog.pg_class i on i.oid = indexrelid where c.oid >= $1 and c.relkind in ('r', 'm') and i.oid >= $1 and i.relkind = 'i' union select relid, owneroid, namespaceoid, spcnode, false, array_fill(-1, ARRAY[$2+1]) from diskquota.show_relation_cache() where relid = primary_table_oid");
 
 	initStringInfo(&delete_statement);
 
@@ -936,13 +936,18 @@ calculate_table_disk_usage(bool is_init)
 	 * and role_size_map
 	 */
 	if (is_init)
-		appendStringInfoString(&sql, ") select coalesce(oid, tableid) oid, coalesce(relowner, 0) relowner, coalesce(relnamespace, 0) relnamespace, coalesce(reltablespace, 0) reltablespace, coalesce(active, true) active from c full join diskquota.table_size t on tableid = oid where coalesce(segid, -1) = -1");
+		appendStringInfoString(&sql, "), t as (select tableid, array_agg(size order by segid) size from diskquota.table_size group by 1) select coalesce(oid, tableid) oid, coalesce(relowner, 0) relowner, coalesce(relnamespace, 0) relnamespace, coalesce(reltablespace, 0) reltablespace, coalesce(active, true) active, coalesce(t.size, c.size) size from c full join t on tableid = oid");
 
-	if ((plan = SPI_prepare(sql.data, 1, (Oid[]){OIDOID})) == NULL)
+	if ((plan = SPI_prepare(sql.data, 2, (Oid[]){OIDOID, INT4OID})) == NULL)
 		ereport(ERROR, (errmsg("[diskquota] SPI_prepare(\"%s\") failed", sql.data)));
 
-	if ((portal = SPI_cursor_open(NULL, plan, (Datum[]){ObjectIdGetDatum(FirstNormalObjectId)}, NULL, true)) == NULL)
+	if ((portal = SPI_cursor_open(NULL, plan, (Datum[]){ObjectIdGetDatum(FirstNormalObjectId), Int32GetDatum(SEGCOUNT)}, NULL, true)) == NULL)
 		ereport(ERROR, (errmsg("[diskquota] SPI_cursor_open(\"%s\") failed", sql.data)));
+
+	int16                      typlen;
+	bool                       typbyval;
+	char                       typalign;
+	get_typlenbyvalalign(INT8OID, &typlen, &typbyval, &typalign);
 
 	do
 	{
@@ -979,6 +984,11 @@ calculate_table_disk_usage(bool is_init)
 
 				continue;
 			}
+
+			Datum	   *sizes;
+			int			nelems;
+			ArrayType *array = DatumGetArrayTypeP(SPI_getbinval_my(val, tupdesc, "size", false, INT8ARRAYOID));
+			deconstruct_array(array, INT8OID, typlen, typbyval, typalign, &sizes, NULL, &nelems);
 
 		/*
 		 * The segid is the same as the content id in gp_segment_configuration
