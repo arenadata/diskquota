@@ -383,8 +383,17 @@ append_active_tables(StringInfo sql, bool is_init)
 
 		appendStringInfo(sql, "with s as (select (diskquota.diskquota_fetch_table_stat(1, '{");
 
-		/* first get all oid of tables which are active table on any segment */
-		/* any errors will be catch in upper level */
+		/*
+		* Get active table list from all the segments.
+		* Since when loading data, there is case where only subset for
+		* segment doing the real loading. As a result, the same table
+		* maybe active on some segments while not active on others. We
+		* haven't store the table size for each segment on master(to save
+		* memory), so when re-calculate the table size, we need to sum the
+		* table size on all of the segments.
+		* First get all oid of tables which are active table on any segment,
+		* any errors will be catch in upper level.
+		*/
 		CdbDispatchCommand("select * from diskquota.diskquota_fetch_table_stat(0, '{}'::oid[])", DF_NONE, &cdb_pgresults);
 
 		for (int i = 0; i < cdb_pgresults.numResults; i++)
