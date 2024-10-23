@@ -911,7 +911,7 @@ calculate_table_disk_usage(bool is_init)
 
 	appendStringInfoString(&sql, "with c as (select oid, relowner, relnamespace, reltablespace, false active, array_fill(-1, ARRAY[$2+1]) size from pg_catalog.pg_class where oid >= $1 and relkind in ('r', 'm') union select i.oid, i.relowner, i.relnamespace, i.reltablespace, false, array_fill(-1, ARRAY[$2+1]) from pg_catalog.pg_index join pg_catalog.pg_class c on c.oid = indrelid join pg_catalog.pg_class i on i.oid = indexrelid where c.oid >= $1 and c.relkind in ('r', 'm') and i.oid >= $1 and i.relkind = 'i' union select relid, owneroid, namespaceoid, spcnode, false, array_fill(-1, ARRAY[$2+1]) from diskquota.show_relation_cache() where relid = primary_table_oid), t as (");
 
-	gp_fetch_active_tables(&sql, is_init);
+	append_active_tables(&sql, is_init);
 
 	appendStringInfoString(&sql, ") select coalesce(oid, tableid) oid, coalesce(relowner, 0) relowner, coalesce(relnamespace, 0) relnamespace, coalesce(reltablespace, 0) reltablespace, coalesce(active, true) active, coalesce(t.size, c.size) size from c full join t on tableid = oid");
 	/*

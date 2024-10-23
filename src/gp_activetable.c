@@ -3,7 +3,7 @@
  * gp_activetable.c
  *
  * This code is responsible for detecting active table for databases
- * quotamodel will call gp_fetch_active_tables() to fetch the active tables
+ * quotamodel will call append_active_tables() to fetch the active tables
  * and their size information in each loop.
  *
  * Copyright (c) 2018-2020 Pivotal Software, Inc.
@@ -87,8 +87,6 @@ static void object_access_hook_QuotaStmt(ObjectAccessType access, Oid classId, O
 
 static HTAB          *get_active_tables_stats(ArrayType *array);
 static HTAB          *get_active_tables_oid(void);
-static void           pull_active_list_from_seg(StringInfo sql);
-static void           load_table_size(StringInfo sql, bool is_init);
 static void           report_active_table_helper(const RelFileNodeBackend *relFileNode);
 static void           remove_from_active_table_map(const RelFileNodeBackend *relFileNode);
 static void           report_relation_cache_helper(Oid relid);
@@ -361,9 +359,58 @@ remove_from_active_table_map(const RelFileNodeBackend *relFileNode)
  * to get the real table size at cluster level.
  */
 void
-gp_fetch_active_tables(StringInfo sql, bool is_init)
+append_active_tables(StringInfo sql, bool is_init)
 {
-	load_table_size(sql, is_init);
+	if (is_init)
+	{
+		/*
+		* Load table size info from diskquota.table_size table.
+		* This is called when system startup, disk quota rejectmap
+		* and other shared memory will be warmed up by table_size table.
+		*/
+		appendStringInfoString(sql, "select tableid, array_agg(size order by segid) size from diskquota.table_size group by 1");
+	}
+	else
+	{
+		/*
+		* Get active table size from all the segments based on
+		* active table oid list.
+		* Function diskquota_fetch_table_stat is called to calculate
+		* the table size on the fly.
+		*/
+		CdbPgResults               cdb_pgresults = {NULL, 0};
+		uint32                     count  = 0;
+
+		appendStringInfo(sql, "with s as (select (diskquota.diskquota_fetch_table_stat(1, '{");
+
+		/* first get all oid of tables which are active table on any segment */
+		/* any errors will be catch in upper level */
+		CdbDispatchCommand("select * from diskquota.diskquota_fetch_table_stat(0, '{}'::oid[])", DF_NONE, &cdb_pgresults);
+
+		for (int i = 0; i < cdb_pgresults.numResults; i++)
+		{
+			PGresult *pgresult = cdb_pgresults.pg_results[i];
+
+			if (PQresultStatus(pgresult) != PGRES_TUPLES_OK)
+			{
+				cdbdisp_clearCdbPgResults(&cdb_pgresults);
+				ereport(ERROR, (errmsg("[diskquota] fetching active tables, encounter unexpected result from segment: %d",
+									PQresultStatus(pgresult))));
+			}
+
+			/* push the active table oid into local_active_table_oid_map */
+			for (int j = 0; j < PQntuples(pgresult); j++)
+			{
+				if (count++ > 0)
+					appendStringInfoString(sql, ",");
+				appendStringInfoString(sql, PQgetvalue(pgresult, j, 0));
+			}
+		}
+
+		cdbdisp_clearCdbPgResults(&cdb_pgresults);
+
+		appendStringInfo(sql, "}'::oid[])).* from gp_dist_random('gp_id')) select \"TABLE_OID\" tableid, array[sum(\"TABLE_SIZE\")::bigint] || array_agg(\"TABLE_SIZE\" order by \"GP_SEGMENT_ID\") size from s group by 1");
+	}
 }
 
 /*
@@ -899,60 +946,4 @@ get_active_tables_oid(void)
 	hash_destroy(local_active_table_file_map);
 	hash_destroy(local_altered_reloid_cache);
 	return local_active_table_stats_map;
-}
-
-/*
- * Load table size info from diskquota.table_size table.
- * This is called when system startup, disk quota rejectmap
- * and other shared memory will be warmed up by table_size table.
- */
-static void
-load_table_size(StringInfo sql, bool is_init)
-{
-	if (is_init)
-		appendStringInfoString(sql, "select tableid, array_agg(size order by segid) size from diskquota.table_size group by 1");
-	else
-		pull_active_list_from_seg(sql);
-}
-
-/*
- * Get active table size from all the segments based on
- * active table oid list.
- * Function diskquota_fetch_table_stat is called to calculate
- * the table size on the fly.
- */
-static void
-pull_active_list_from_seg(StringInfo sql)
-{
-	CdbPgResults               cdb_pgresults = {NULL, 0};
-	int                        i, j;
-	uint32                     count  = 0;
-
-	appendStringInfo(sql, "with s as (select (diskquota.diskquota_fetch_table_stat(1, '{");
-
-	/* first get all oid of tables which are active table on any segment */
-	/* any errors will be catch in upper level */
-	CdbDispatchCommand("select * from diskquota.diskquota_fetch_table_stat(0, '{}'::oid[])", DF_NONE, &cdb_pgresults);
-	for (i = 0; i < cdb_pgresults.numResults; i++)
-	{
-		PGresult *pgresult = cdb_pgresults.pg_results[i];
-
-		if (PQresultStatus(pgresult) != PGRES_TUPLES_OK)
-		{
-			cdbdisp_clearCdbPgResults(&cdb_pgresults);
-			ereport(ERROR, (errmsg("[diskquota] fetching active tables, encounter unexpected result from segment: %d",
-			                       PQresultStatus(pgresult))));
-		}
-
-		/* push the active table oid into local_active_table_oid_map */
-		for (j = 0; j < PQntuples(pgresult); j++)
-		{
-			if (count++ > 0)
-				appendStringInfoString(sql, ",");
-			appendStringInfoString(sql, PQgetvalue(pgresult, j, 0));
-		}
-	}
-	cdbdisp_clearCdbPgResults(&cdb_pgresults);
-
-	appendStringInfo(sql, "}'::oid[])).* from gp_dist_random('gp_id')) select \"TABLE_OID\" tableid, array[sum(\"TABLE_SIZE\")::bigint] || array_agg(\"TABLE_SIZE\" order by \"GP_SEGMENT_ID\") size from s group by 1");
 }
