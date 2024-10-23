@@ -913,7 +913,7 @@ calculate_table_disk_usage(bool is_init)
 	if (is_init)
 		appendStringInfoString(&sql, "with c as (");
 
-	appendStringInfoString(&sql, "select oid, relowner, relnamespace, reltablespace, 1 as type from pg_catalog.pg_class where oid >= $1 and relkind in ('r', 'm') union select i.oid, i.relowner, i.relnamespace, i.reltablespace, 2 from pg_catalog.pg_index join pg_catalog.pg_class c on c.oid = indrelid join pg_catalog.pg_class i on i.oid = indexrelid where c.oid >= $1 and c.relkind in ('r', 'm') and i.oid >= $1 and i.relkind = 'i' union select relid, owneroid, namespaceoid, spcnode, 3 from diskquota.show_relation_cache() where relid = primary_table_oid");
+	appendStringInfoString(&sql, "select oid, relowner, relnamespace, reltablespace, false as active from pg_catalog.pg_class where oid >= $1 and relkind in ('r', 'm') union select i.oid, i.relowner, i.relnamespace, i.reltablespace, false from pg_catalog.pg_index join pg_catalog.pg_class c on c.oid = indrelid join pg_catalog.pg_class i on i.oid = indexrelid where c.oid >= $1 and c.relkind in ('r', 'm') and i.oid >= $1 and i.relkind = 'i' union select relid, owneroid, namespaceoid, spcnode, false from diskquota.show_relation_cache() where relid = primary_table_oid");
 
 	initStringInfo(&delete_statement);
 
@@ -936,7 +936,7 @@ calculate_table_disk_usage(bool is_init)
 	 * and role_size_map
 	 */
 	if (is_init)
-		appendStringInfoString(&sql, ") select coalesce(oid, tableid) oid, coalesce(relowner, 0) relowner, coalesce(relnamespace, 0) relnamespace, coalesce(reltablespace, 0) reltablespace, coalesce(type, 0) type from c full join diskquota.table_size t on tableid = oid where coalesce(segid, -1) = -1");
+		appendStringInfoString(&sql, ") select coalesce(oid, tableid) oid, coalesce(relowner, 0) relowner, coalesce(relnamespace, 0) relnamespace, coalesce(reltablespace, 0) reltablespace, coalesce(active, true) active from c full join diskquota.table_size t on tableid = oid where coalesce(segid, -1) = -1");
 
 	if ((plan = SPI_prepare(sql.data, 1, (Oid[]){OIDOID})) == NULL)
 		ereport(ERROR, (errmsg("[diskquota] SPI_prepare(\"%s\") failed", sql.data)));
@@ -956,12 +956,12 @@ calculate_table_disk_usage(bool is_init)
 			Oid           relowner      = DatumGetObjectId(SPI_getbinval_my(val, tupdesc, "relowner", false, OIDOID));
 			Oid           reltablespace = DatumGetObjectId(SPI_getbinval_my(val, tupdesc, "reltablespace", false, OIDOID));
        		Oid relOid = DatumGetObjectId(SPI_getbinval_my(val, tupdesc, "oid", false, OIDOID));
-       		int type = DatumGetInt32(SPI_getbinval_my(val, tupdesc, "type", false, INT4OID));
+       		bool active = DatumGetBool(SPI_getbinval_my(val, tupdesc, "active", false, BOOLOID));
 
 			if (!OidIsValid(reltablespace))
 				reltablespace = MyDatabaseTableSpace;
 
-			if (is_init && type == 0)
+			if (is_init && active)
 			{
 				for (int i = -1; i < SEGCOUNT; i++)
 				{
