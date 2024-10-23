@@ -1008,7 +1008,7 @@ load_table_size(HTAB *local_table_stats_map, bool is_init)
 			deconstruct_array(DatumGetArrayTypeP(dat), INT8OID, typlen, typbyval, typalign, &sizes, NULL, &nelems);
 			for (int j = 0; j < nelems; j++)
 			{
-				quota_entry->tablesize[j + (is_init ? 0 : 1)] = DatumGetInt64(sizes[j]);
+				quota_entry->tablesize[j] = DatumGetInt64(sizes[j]);
 				/* tablesize for index 0 is the sum of tablesize of master and all segments */
 				if (!is_init)
 					quota_entry->tablesize[0] = (j > 0 ? quota_entry->tablesize[0] : 0) + DatumGetInt64(sizes[j]);
@@ -1068,7 +1068,7 @@ pull_active_list_from_seg(void)
 	}
 	cdbdisp_clearCdbPgResults(&cdb_pgresults);
 
-	appendStringInfo(&buffer, "}'::oid[])).* from gp_dist_random('gp_id')) select \"TABLE_OID\", array_agg(\"TABLE_SIZE\" order by \"GP_SEGMENT_ID\") \"TABLE_SIZE\" from s group by 1 order by 1");
+	appendStringInfo(&buffer, "}'::oid[])).* from gp_dist_random('gp_id')) select \"TABLE_OID\" tableid, array[0] || array_agg(\"TABLE_SIZE\" order by \"GP_SEGMENT_ID\") size from s group by 1 order by 1");
 
 	return buffer.data;
 }
