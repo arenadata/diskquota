@@ -923,22 +923,21 @@ calculate_table_disk_usage(StringInfo active_oids, bool is_init)
 	 * Firstly the all the table which relkind is 'r' or 'm' and not system table.
 	 * Also, fetch the indexes of those tables.
 	 */
-	appendStringInfoString(
-	        &sql,
-	        "with c as ( "
-	        "	select oid, relowner, relnamespace, reltablespace, false active, array_fill(-1, ARRAY[$2+1]) size "
-	        "		from pg_catalog.pg_class where oid >= $1 and relkind in ('r', 'm') "
-	        "	union "
-	        "	select i.oid, i.relowner, i.relnamespace, i.reltablespace, false, array_fill(-1, ARRAY[$2+1]) "
-	        "		from pg_catalog.pg_index "
-	        "		join pg_catalog.pg_class c on c.oid = indrelid "
-	        "		join pg_catalog.pg_class i on i.oid = indexrelid "
-	        "	where c.oid >= $1 and c.relkind in ('r', 'm') and i.oid >= $1 and i.relkind = 'i' "
-	        "	union "
-	        "	select relid, owneroid, namespaceoid, spcnode, false, array_fill(-1, ARRAY[$2+1]) "
-	        "		from diskquota.show_relation_cache() "
-	        "	where relid = primary_table_oid "
-	        "), t as (");
+	appendStringInfoString(&sql,
+	                       "with c as ( "
+	                       "	select oid, relowner, relnamespace, reltablespace "
+	                       "		from pg_catalog.pg_class where oid >= $1 and relkind in ('r', 'm') "
+	                       "	union "
+	                       "	select i.oid, i.relowner, i.relnamespace, i.reltablespace "
+	                       "		from pg_catalog.pg_index "
+	                       "		join pg_catalog.pg_class c on c.oid = indrelid "
+	                       "		join pg_catalog.pg_class i on i.oid = indexrelid "
+	                       "	where c.oid >= $1 and c.relkind in ('r', 'm') and i.oid >= $1 and i.relkind = 'i' "
+	                       "	union "
+	                       "	select relid, owneroid, namespaceoid, spcnode "
+	                       "		from diskquota.show_relation_cache() "
+	                       "	where relid = primary_table_oid "
+	                       "), t as (");
 
 	/*
 	 * On init stage, info from diskquota.table_size are added to invalidate them.
@@ -946,14 +945,8 @@ calculate_table_disk_usage(StringInfo active_oids, bool is_init)
 	append_active_tables(&sql, is_init);
 
 	appendStringInfoString(&sql,
-	                       ") select "
-	                       "	coalesce(oid, tableid) oid, "
-	                       "	coalesce(relowner, 0) relowner, "
-	                       "	coalesce(relnamespace, 0) relnamespace, "
-	                       "	coalesce(reltablespace, 0) reltablespace, "
-	                       "	coalesce(active, true) active, "
-	                       "	coalesce(t.size, c.size) size "
-	                       "from c full join t on tableid = oid");
+	                       ") select coalesce(oid, tableid) oid, relowner, relnamespace, reltablespace, t.size "
+	                       "	from c full join t on tableid = oid");
 
 	/*
 	 * unset is_exist flag for tsentry in table_size_map this is used to
@@ -985,18 +978,19 @@ calculate_table_disk_usage(StringInfo active_oids, bool is_init)
 		SPI_cursor_fetch(portal, true, 10000);
 		for (uint64 row = 0; row < SPI_processed; row++)
 		{
-			HeapTuple val           = SPI_tuptable->vals[row];
-			TupleDesc tupdesc       = SPI_tuptable->tupdesc;
-			Oid       relnamespace  = DatumGetObjectId(SPI_getbinval_my(val, tupdesc, "relnamespace", false, OIDOID));
-			Oid       relowner      = DatumGetObjectId(SPI_getbinval_my(val, tupdesc, "relowner", false, OIDOID));
-			Oid       reltablespace = DatumGetObjectId(SPI_getbinval_my(val, tupdesc, "reltablespace", false, OIDOID));
-			Oid       relOid        = DatumGetObjectId(SPI_getbinval_my(val, tupdesc, "oid", false, OIDOID));
-			bool      active        = DatumGetBool(SPI_getbinval_my(val, tupdesc, "active", false, BOOLOID));
+			HeapTuple  val           = SPI_tuptable->vals[row];
+			TupleDesc  tupdesc       = SPI_tuptable->tupdesc;
+			Oid        relOid        = DatumGetObjectId(SPI_getbinval_my(val, tupdesc, "oid", false, OIDOID));
+			Oid        relowner      = DatumGetObjectId(SPI_getbinval_my(val, tupdesc, "relowner", true, OIDOID));
+			Oid        relnamespace  = DatumGetObjectId(SPI_getbinval_my(val, tupdesc, "relnamespace", true, OIDOID));
+			Oid        reltablespace = DatumGetObjectId(SPI_getbinval_my(val, tupdesc, "reltablespace", true, OIDOID));
+			ArrayType *array         = DatumGetArrayTypePmy(SPI_getbinval_my(val, tupdesc, "size", true, INT8ARRAYOID));
+			Size      *tablesize     = NULL;
 
-			if (!OidIsValid(reltablespace)) reltablespace = MyDatabaseTableSpace;
-
-			if (is_init && active)
+			if (!OidIsValid(relowner) || !OidIsValid(relnamespace))
 			{
+				if (!is_init) continue;
+
 				for (int i = -1; i < SEGCOUNT; i++)
 				{
 					appendStringInfo(&delete_statement, "%s(%u,%d)", (delete_entries_num == 0) ? " " : ", ", relOid, i);
@@ -1014,16 +1008,23 @@ calculate_table_disk_usage(StringInfo active_oids, bool is_init)
 				continue;
 			}
 
-			Datum     *sizes;
-			int        nelems;
-			ArrayType *array = DatumGetArrayTypeP(SPI_getbinval_my(val, tupdesc, "size", false, INT8ARRAYOID));
-			deconstruct_array(array, INT8OID, typlen, typbyval, typalign, &sizes, NULL, &nelems);
-			Size *tablesize = palloc(nelems * sizeof(*tablesize));
-			for (int j = 0; j < nelems; j++) tablesize[j] = DatumGetInt64(sizes[j]);
+			if (!OidIsValid(reltablespace)) reltablespace = MyDatabaseTableSpace;
 
-			if (tablesize[0] != -1)
+			if (array)
 			{
+				Datum *sizes;
+				int    nelems;
+
+				deconstruct_array(array, ARR_ELEMTYPE(array), typlen, typbyval, typalign, &sizes, NULL, &nelems);
+
+				Assert(nelems == SEGCOUNT + 1);
+
+				tablesize = palloc(nelems * sizeof(*tablesize));
+
+				for (int j = 0; j < nelems; j++) tablesize[j] = DatumGetInt64(sizes[j]);
+
 				if (count++ > 0) appendStringInfo(active_oids, ",");
+
 				appendStringInfo(active_oids, "%d", relOid);
 			}
 
@@ -1069,7 +1070,7 @@ calculate_table_disk_usage(StringInfo active_oids, bool is_init)
 				if (tsentry) set_table_size_entry_flag(tsentry, TABLE_EXIST);
 
 				/* skip to recalculate the tables which are not in active list */
-				if (tablesize[0] != -1)
+				if (tablesize)
 				{
 					if (cur_segid == -1)
 					{
@@ -1137,7 +1138,8 @@ calculate_table_disk_usage(StringInfo active_oids, bool is_init)
 					tsentry->tablespaceoid = reltablespace;
 				}
 			}
-			pfree(tablesize);
+
+			if (tablesize) pfree(tablesize);
 		}
 	} while (SPI_processed);
 
