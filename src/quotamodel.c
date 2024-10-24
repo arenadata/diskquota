@@ -800,10 +800,9 @@ refresh_disk_quota_model(bool is_init)
 static void
 refresh_disk_quota_usage(bool is_init)
 {
-	bool           connected          = false;
-	bool           pushed_active_snap = false;
-	bool           ret                = true;
-	StringInfoData active_oids;
+	bool connected          = false;
+	bool pushed_active_snap = false;
+	bool ret                = true;
 
 	StartTransactionCommand();
 
@@ -814,6 +813,7 @@ refresh_disk_quota_usage(bool is_init)
 	 */
 	PG_TRY();
 	{
+		StringInfoData active_oids;
 		if (SPI_OK_CONNECT != SPI_connect())
 		{
 			ereport(ERROR,

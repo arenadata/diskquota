@@ -380,7 +380,7 @@ append_active_tables(StringInfo sql, bool is_init)
 		 * the table size on the fly.
 		 */
 		CdbPgResults cdb_pgresults = {NULL, 0};
-		uint32       count         = 0;
+		int          count         = 0;
 
 		appendStringInfo(sql, "with s as (select (diskquota.diskquota_fetch_table_stat(1, '{");
 
