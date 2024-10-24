@@ -1290,68 +1290,6 @@ out:
 	return ret;
 }
 
-/*
- * Get the list of oids of the tables which diskquota
- * needs to care about in the database.
- * Firstly the all the table oids which relkind is 'r'
- * or 'm' and not system table. On init stage, oids from
- * diskquota.table_size are added to invalidate them.
- * Then, fetch the indexes of those tables.
- */
-
-List *
-get_rel_oid_list(bool is_init)
-{
-	List *oidlist = NIL;
-	int   ret;
-
-#define SELECT_FROM_PG_CATALOG_PG_CLASS "select oid from pg_catalog.pg_class where oid >= $1 and relkind in ('r', 'm')"
-
-	ret = SPI_execute_with_args(is_init ? SELECT_FROM_PG_CATALOG_PG_CLASS
-	                                    " union distinct"
-	                                    " select tableid from diskquota.table_size where segid = -1"
-	                                    : SELECT_FROM_PG_CATALOG_PG_CLASS,
-	                            1,
-	                            (Oid[]){
-	                                    OIDOID,
-	                            },
-	                            (Datum[]){
-	                                    ObjectIdGetDatum(FirstNormalObjectId),
-	                            },
-	                            NULL, false, 0);
-
-#undef SELECT_FROM_PG_CATALOG_PG_CLASS
-
-	if (ret != SPI_OK_SELECT) elog(ERROR, "cannot fetch in pg_class. error code %d", ret);
-
-	TupleDesc tupdesc = SPI_tuptable->tupdesc;
-	for (int i = 0; i < SPI_processed; i++)
-	{
-		HeapTuple tup;
-		bool      isnull;
-		Oid       oid;
-		ListCell *l;
-
-		tup = SPI_tuptable->vals[i];
-		oid = DatumGetObjectId(SPI_getbinval(tup, tupdesc, 1, &isnull));
-		if (!isnull)
-		{
-			List *indexIds;
-			oidlist  = lappend_oid(oidlist, oid);
-			indexIds = diskquota_get_index_list(oid);
-			if (indexIds != NIL)
-			{
-				foreach (l, indexIds)
-				{
-					oidlist = lappend_oid(oidlist, lfirst_oid(l));
-				}
-			}
-			list_free(indexIds);
-		}
-	}
-	return oidlist;
-}
-
 typedef struct
 {
 	char *relation_path;

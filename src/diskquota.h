@@ -75,6 +75,8 @@ extern int diskquota_worker_timeout;
 #define DiskquotaGetRelstorage(classForm) (0)
 #endif /* GP_VERSION_NUM */
 
+#define DatumGetArrayTypePmy(X) ((X) ? DatumGetArrayTypeP(X) : NULL)
+
 typedef enum
 {
 	NAMESPACE_QUOTA = 0,
@@ -291,7 +293,6 @@ extern int   diskquota_hashmap_overflow_report_timeout;
 extern int      SEGCOUNT;
 extern int      worker_spi_get_extension_version(int *major, int *minor);
 extern void     truncateStringInfo(StringInfo str, int nchars);
-extern List    *get_rel_oid_list(bool is_init);
 extern int64    calculate_relation_size_all_forks(RelFileNodeBackend *rnode, char relstorage, Oid relam);
 extern Relation diskquota_relation_open(Oid relid);
 extern bool     get_rel_name_namespace(Oid relid, Oid *nsOid, char *relname);
