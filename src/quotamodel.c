@@ -966,11 +966,10 @@ calculate_table_disk_usage(StringInfo active_oids, bool is_init)
 	 * and role_size_map
 	 */
 
-	if ((plan = SPI_prepare(sql.data, 2, (Oid[]){OIDOID, INT4OID})) == NULL)
+	if ((plan = SPI_prepare(sql.data, 1, (Oid[]){OIDOID})) == NULL)
 		ereport(ERROR, (errmsg("[diskquota] SPI_prepare(\"%s\") failed", sql.data)));
 
-	if ((portal = SPI_cursor_open(NULL, plan, (Datum[]){ObjectIdGetDatum(FirstNormalObjectId), Int32GetDatum(SEGCOUNT)},
-	                              NULL, true)) == NULL)
+	if ((portal = SPI_cursor_open(NULL, plan, (Datum[]){ObjectIdGetDatum(FirstNormalObjectId)}, NULL, true)) == NULL)
 		ereport(ERROR, (errmsg("[diskquota] SPI_cursor_open(\"%s\") failed", sql.data)));
 
 	do
