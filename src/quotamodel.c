@@ -912,6 +912,7 @@ calculate_table_disk_usage(StringInfo active_oids, bool is_init)
 	int16             typlen;
 	bool              typbyval;
 	char              typalign;
+	Size             *tablesize = palloc((SEGCOUNT + 1) * sizeof(*tablesize));
 
 	get_typlenbyvalalign(INT8OID, &typlen, &typbyval, &typalign);
 
@@ -985,7 +986,12 @@ calculate_table_disk_usage(StringInfo active_oids, bool is_init)
 			Oid        relnamespace  = DatumGetObjectId(SPI_getbinval_my(val, tupdesc, "relnamespace", true, OIDOID));
 			Oid        reltablespace = DatumGetObjectId(SPI_getbinval_my(val, tupdesc, "reltablespace", true, OIDOID));
 			ArrayType *array         = DatumGetArrayTypePmy(SPI_getbinval_my(val, tupdesc, "size", true, INT8ARRAYOID));
-			Size      *tablesize     = NULL;
+
+			if (array)
+			{
+				if (count++ > 0) appendStringInfo(active_oids, ",");
+				appendStringInfo(active_oids, "%d", relOid);
+			}
 
 			if (!OidIsValid(relowner) || !OidIsValid(relnamespace))
 			{
@@ -1016,16 +1022,8 @@ calculate_table_disk_usage(StringInfo active_oids, bool is_init)
 				int    nelems;
 
 				deconstruct_array(array, ARR_ELEMTYPE(array), typlen, typbyval, typalign, &sizes, NULL, &nelems);
-
 				Assert(nelems == SEGCOUNT + 1);
-
-				tablesize = palloc(nelems * sizeof(*tablesize));
-
 				for (int j = 0; j < nelems; j++) tablesize[j] = DatumGetInt64(sizes[j]);
-
-				if (count++ > 0) appendStringInfo(active_oids, ",");
-
-				appendStringInfo(active_oids, "%d", relOid);
 			}
 
 			/*
@@ -1070,7 +1068,7 @@ calculate_table_disk_usage(StringInfo active_oids, bool is_init)
 				if (tsentry) set_table_size_entry_flag(tsentry, TABLE_EXIST);
 
 				/* skip to recalculate the tables which are not in active list */
-				if (tablesize)
+				if (array)
 				{
 					if (cur_segid == -1)
 					{
@@ -1138,14 +1136,13 @@ calculate_table_disk_usage(StringInfo active_oids, bool is_init)
 					tsentry->tablespaceoid = reltablespace;
 				}
 			}
-
-			if (tablesize) pfree(tablesize);
 		}
 	} while (SPI_processed);
 
 	SPI_freetuptable(SPI_tuptable);
 	SPI_cursor_close(portal);
 	SPI_freeplan(plan);
+	pfree(tablesize);
 
 	if (delete_entries_num) delete_from_table_size_map(delete_statement.data);
 
