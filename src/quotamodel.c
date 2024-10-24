@@ -975,7 +975,7 @@ calculate_table_disk_usage(StringInfo active_oids, bool is_init)
 	do
 	{
 		SPI_freetuptable(SPI_tuptable);
-		SPI_cursor_fetch(portal, true, 10000);
+		SPI_cursor_fetch(portal, true, 1000);
 		for (uint64 row = 0; row < SPI_processed; row++)
 		{
 			HeapTuple  val           = SPI_tuptable->vals[row];
