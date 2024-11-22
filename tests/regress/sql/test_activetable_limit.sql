@@ -30,7 +30,7 @@ SELECT diskquota.wait_for_worker_new_epoch();
 CREATE TABLE s.t1 (a int, b int) DISTRIBUTED BY (a)
     PARTITION BY RANGE (b) ( START (0) END (10) EVERY (1) );
 
-SELECT count(*) FROM gp_toolkit.__gp_log_segment_ext JOIN pg_stat_activity a ON logsession = 'con'||sess_id WHERE pid = pg_backend_pid() AND logmessage LIKE '%the number of active tables reached the limit%';
+SELECT count(*) FROM gp_toolkit.__gp_log_segment_ext JOIN pg_stat_activity ON logsession = 'con'||sess_id WHERE pid = pg_backend_pid() AND logmessage LIKE '%the number of active tables reached the limit%';
 
 CREATE TABLE s.t2(i int) DISTRIBUTED BY (i);
 INSERT INTO s.t2 SELECT generate_series(1, 100000);
@@ -43,7 +43,7 @@ SELECT count(*) FROM s.t1;
 -- altered reloid cache overflow check. expected warning.
 VACUUM FULL;
 
-SELECT count(*) FROM gp_toolkit.__gp_log_segment_ext JOIN pg_stat_activity a ON logsession = 'con'||sess_id WHERE pid = pg_backend_pid() AND logmessage LIKE '%the number of altered reloid cache entries reached the limit%';
+SELECT count(*) FROM gp_toolkit.__gp_log_segment_ext JOIN pg_stat_activity ON logsession = 'con'||sess_id WHERE pid = pg_backend_pid() AND logmessage LIKE '%the number of altered reloid cache entries reached the limit%';
 
 DROP EXTENSION diskquota;
 
