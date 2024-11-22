@@ -809,9 +809,9 @@ refresh_disk_quota_model(bool is_init)
 static void
 refresh_disk_quota_usage(bool is_init)
 {
-	volatile bool  pushed_active_snap = false;
-	volatile bool  ret                = true;
-	StringInfoData active_oids        = {0};
+	volatile bool           pushed_active_snap = false;
+	volatile bool           ret                = true;
+	volatile StringInfoData active_oids        = {0};
 
 	StartTransactionCommand();
 
