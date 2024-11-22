@@ -183,6 +183,11 @@ struct LocalRejectMapEntry
 	bool           segexceeded;
 };
 
+typedef struct
+{
+	ArrayBuildState *tableids;
+} ActiveArrays;
+
 /* using hash table to support incremental update the table size entry.*/
 static HTAB *table_size_map = NULL;
 /* stored in shared memory */
@@ -220,10 +225,10 @@ static void transfer_table_for_quota(int64 totalsize, QuotaType type, Oid *old_k
 
 /* functions to refresh disk quota model*/
 static void refresh_disk_quota_usage(bool is_init);
-static void calculate_table_disk_usage(StringInfo active_oids, bool is_init);
+static void calculate_table_disk_usage(ActiveArrays *active, bool is_init);
 static void flush_to_table_size(void);
 static bool flush_local_reject_map(void);
-static void dispatch_rejectmap(char *active_oids);
+static void dispatch_rejectmap(ActiveArrays *active);
 static bool load_quotas(void);
 static void do_load_quotas(void);
 
@@ -809,9 +814,9 @@ refresh_disk_quota_model(bool is_init)
 static void
 refresh_disk_quota_usage(bool is_init)
 {
-	volatile bool           pushed_active_snap = false;
-	volatile bool           ret                = true;
-	volatile StringInfoData active_oids        = {0};
+	volatile bool pushed_active_snap = false;
+	volatile bool ret                = true;
+	ActiveArrays  active             = {0};
 
 	StartTransactionCommand();
 
@@ -828,12 +833,10 @@ refresh_disk_quota_usage(bool is_init)
 		 * initialization stage all the tables are active. later loop, only the
 		 * tables whose disk size changed will be treated as active
 		 *
-		 * active_oids only contains the active tables which belong
+		 * active only contains the active tables which belong
 		 * to the current database.
 		 */
-		initStringInfo(&active_oids);
-		calculate_table_disk_usage(&active_oids, is_init);
-		bool hasActiveTable = (active_oids.len > 0);
+		calculate_table_disk_usage(&active, is_init);
 		/* refresh quota_info_map */
 		refresh_quota_info_map();
 		/* flush local table_size_map to user table table_size */
@@ -846,8 +849,7 @@ refresh_disk_quota_usage(bool is_init)
 		 * Otherwise, only when the rejectmap is changed or the active_table_list is
 		 * not empty the rejectmap should be dispatched to segments.
 		 */
-		if (is_init || (diskquota_hardlimit && (reject_map_changed || hasActiveTable)))
-			dispatch_rejectmap(active_oids.data);
+		if (is_init || (diskquota_hardlimit && (reject_map_changed || active.tableids))) dispatch_rejectmap(&active);
 	}
 	PG_CATCH();
 	{
@@ -860,7 +862,7 @@ refresh_disk_quota_usage(bool is_init)
 		RESUME_INTERRUPTS();
 	}
 	PG_END_TRY();
-	if (active_oids.data) pfree(active_oids.data);
+	// if (active.tableids) pfree(active.tableids);
 	if (pushed_active_snap) PopActiveSnapshot();
 	if (ret)
 		CommitTransactionCommand();
@@ -881,7 +883,7 @@ refresh_disk_quota_usage(bool is_init)
  */
 
 static void
-calculate_table_disk_usage(StringInfo active_oids, bool is_init)
+calculate_table_disk_usage(ActiveArrays *active, bool is_init)
 {
 	bool              table_size_map_found;
 	int64             updated_total_size;
@@ -892,7 +894,6 @@ calculate_table_disk_usage(StringInfo active_oids, bool is_init)
 	SPIPlanPtr     plan;
 	Portal         portal;
 	StringInfoData sql;
-	int            count = 0;
 	int16          typlen;
 	bool           typbyval;
 	char           typalign;
@@ -972,8 +973,8 @@ calculate_table_disk_usage(StringInfo active_oids, bool is_init)
 
 			if (array)
 			{
-				if (count++ > 0) appendStringInfo(active_oids, ",");
-				appendStringInfo(active_oids, "%d", relOid);
+				active->tableids = accumArrayResult(active->tableids, ObjectIdGetDatum(relOid), false, OIDOID,
+				                                    CurrentMemoryContext);
 			}
 
 			if (!OidIsValid(relowner) || !OidIsValid(relnamespace))
@@ -1357,26 +1358,22 @@ flush_local_reject_map(void)
  * Dispatch rejectmap to segment servers.
  */
 static void
-dispatch_rejectmap(char *active_oids)
+dispatch_rejectmap(ActiveArrays *active)
 {
-	StringInfoData sql;
-
-	initStringInfo(&sql);
-	appendStringInfo(&sql,
-	                 "select diskquota.refresh_rejectmap("
-	                 "select array_agg((target_oid, database_oid, tablespace_oid, target_type, "
-	                 "seg_exceeded)::diskquota.rejectmap_entry) "
-	                 "from diskquota.show_rejectmap(), "
-	                 "ARRAY[%s]::oid[]) from gp_dist_random('gp_id')",
-	                 active_oids);
-
-	bool connected_in_this_function = SPI_connect_if_not_yet();
-	int  ret                        = SPI_execute(sql.data, false, 0);
-	if (ret != SPI_OK_SELECT)
-		ereport(ERROR, (errcode(ERRCODE_INTERNAL_ERROR),
-		                errmsg("[diskquota] diskquota.refresh_rejectmap SPI_execute failed: error code %d", ret)));
+	Datum tableid                    = active->tableids ? makeArrayResult(active->tableids, CurrentMemoryContext)
+	                                                    : PointerGetDatum(construct_empty_array(OIDOID));
+	bool  connected_in_this_function = SPI_connect_if_not_yet();
+	int   ret                        = SPI_execute_with_args(
+	                                 "select diskquota.refresh_rejectmap(select array_agg((target_oid, database_oid, tablespace_oid, "
+                                                              "target_type, seg_exceeded)::diskquota.rejectmap_entry) from diskquota.show_rejectmap(), $1) from "
+                                                              "gp_dist_random('gp_id')",
+	                                 1, (Oid[]){OIDARRAYOID}, (Datum[]){tableid}, NULL, false, 0);
+	ereportif(ret != SPI_OK_SELECT, ERROR,
+	          (errcode(ERRCODE_INTERNAL_ERROR),
+	           errmsg("[diskquota] diskquota.refresh_rejectmap SPI_execute failed: error code %d", ret)));
 	SPI_finish_if(connected_in_this_function);
-	pfree(sql.data);
+	pfree(DatumGetPointer(tableid));
+	active->tableids = NULL;
 }
 
 /*
