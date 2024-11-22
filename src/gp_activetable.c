@@ -393,7 +393,8 @@ append_active_tables(StringInfo sql, bool is_init)
 		 * any errors will be catch in upper level.
 		 */
 		appendStringInfo(sql,
-		                 "with a as (select (diskquota.diskquota_fetch_table_stat(0, '{}'::oid[])).* from gp_dist_random('gp_id')) select coalesce(array_agg(\"TABLE_OID\"), '{}'::oid[]) from a");
+		                 "with a as (select (diskquota.diskquota_fetch_table_stat(0, '{}'::oid[])).* from "
+		                 "gp_dist_random('gp_id')) select coalesce(array_agg(\"TABLE_OID\"), '{}'::oid[]) from a");
 
 		appendStringInfo(
 		        sql,
