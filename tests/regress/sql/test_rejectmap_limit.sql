@@ -12,14 +12,6 @@ CREATE DATABASE test_reject_map_limit_01;
 \c test_reject_map_limit_01
 CREATE EXTENSION diskquota;
 SELECT diskquota.wait_for_worker_new_epoch();
--- we only read the current log file
-CREATE EXTERNAL WEB TABLE master_log(line text)
-    EXECUTE 'if [ -d "$GP_SEG_DATADIR/pg_log" ]; then 
-            cat $GP_SEG_DATADIR/pg_log/$(ls -Art $GP_SEG_DATADIR/pg_log | tail -n 1)
-        else
-            cat $GP_SEG_DATADIR/log/$(ls -Art $GP_SEG_DATADIR/log | tail -n 1)
-        fi'
-    ON MASTER FORMAT 'TEXT' (DELIMITER 'OFF');
 
 CREATE SCHEMA s1;
 CREATE SCHEMA s2;
@@ -48,7 +40,7 @@ INSERT INTO s5.a SELECT generate_series(1,100000);
 
 SELECT diskquota.wait_for_worker_new_epoch();
 
-SELECT count(*) FROM master_log WHERE line LIKE '%the number of local quota reject map entries reached the limit%' AND line NOT LIKE '%LOG%';
+SELECT count(*) FROM gp_toolkit.__gp_log_master_ext WHERE logmessage LIKE '%the number of local quota reject map entries reached the limit%' AND logmessage NOT LIKE '%LOG%';
 
 DROP EXTENSION diskquota;
 
