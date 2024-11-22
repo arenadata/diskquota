@@ -379,10 +379,7 @@ append_active_tables(StringInfo sql, bool is_init)
 		 * Function diskquota_fetch_table_stat is called to calculate
 		 * the table size on the fly.
 		 */
-		CdbPgResults cdb_pgresults = {NULL, 0};
-		int          count         = 0;
-
-		appendStringInfo(sql, "with s as (select (diskquota.diskquota_fetch_table_stat(1, '{");
+		appendStringInfo(sql, "with s as (select (diskquota.diskquota_fetch_table_stat(1, (");
 
 		/*
 		 * Get active table list from all the segments.
@@ -395,33 +392,12 @@ append_active_tables(StringInfo sql, bool is_init)
 		 * First get all oid of tables which are active table on any segment,
 		 * any errors will be catch in upper level.
 		 */
-		CdbDispatchCommand("select * from diskquota.diskquota_fetch_table_stat(0, '{}'::oid[])", DF_NONE,
-		                   &cdb_pgresults);
-
-		for (int i = 0; i < cdb_pgresults.numResults; i++)
-		{
-			PGresult *pgresult = cdb_pgresults.pg_results[i];
-
-			if (PQresultStatus(pgresult) != PGRES_TUPLES_OK)
-			{
-				cdbdisp_clearCdbPgResults(&cdb_pgresults);
-				ereport(ERROR,
-				        (errmsg("[diskquota] fetching active tables, encounter unexpected result from segment: %d",
-				                PQresultStatus(pgresult))));
-			}
-
-			for (int j = 0; j < PQntuples(pgresult); j++)
-			{
-				if (count++ > 0) appendStringInfoString(sql, ",");
-				appendStringInfoString(sql, PQgetvalue(pgresult, j, 0));
-			}
-		}
-
-		cdbdisp_clearCdbPgResults(&cdb_pgresults);
+		appendStringInfo(sql,
+		                 "with a as (select (diskquota.diskquota_fetch_table_stat(0, '{}'::oid[])).* from gp_dist_random('gp_id')) select coalesce(array_agg(\"TABLE_OID\"), '{}'::oid[]) from a");
 
 		appendStringInfo(
 		        sql,
-		        "}'::oid[])).* from gp_dist_random('gp_id') "
+		        "))).* from gp_dist_random('gp_id') "
 		        ") select "
 		        "	\"TABLE_OID\" tableid, "
 		        "	array[sum(\"TABLE_SIZE\")::bigint] || array_agg(\"TABLE_SIZE\" order by \"GP_SEGMENT_ID\") size "
