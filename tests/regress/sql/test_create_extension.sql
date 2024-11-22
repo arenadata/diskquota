@@ -1,17 +1,30 @@
 -- check that diskquota ignores global flag appendonly=true
 
--- for GPDB 6
-SET gp_default_storage_options='appendonly=true';
--- for GPDB 7
-SET default_table_access_method='ao_row';
+-- start_matchsubs
+-- m/CREATE EXTENSION$/
+-- s/CREATE EXTENSION$/CREATE/
+-- m/DROP EXTENSION$/
+-- s/DROP EXTENSION$/DROP/
+-- end_matchsubs
+
+-- start_ignore
+SELECT CASE
+    WHEN current_setting('server_version_num')::int > 120000
+    THEN set_config('default_table_access_method', 'ao_row', false)
+    ELSE set_config('gp_default_storage_options', 'appendonly=true', false)
+END;
+-- end_ignore
 
 CREATE EXTENSION diskquota;
 DROP EXTENSION diskquota;
 
--- for GPDB 6
-SET gp_default_storage_options='appendonly=false';
--- for GPDB 7
-SET default_table_access_method='heap';
+-- start_ignore
+SELECT CASE
+    WHEN current_setting('server_version_num')::int > 120000
+    THEN set_config('default_table_access_method', 'heap', false)
+    ELSE set_config('gp_default_storage_options', 'appendonly=false', false)
+END;
+-- end_ignore
 
 CREATE EXTENSION diskquota;
 

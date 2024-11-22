@@ -1,16 +1,12 @@
 -- check that diskquota ignores global flag appendonly=true
--- for GPDB 6
-SET gp_default_storage_options='appendonly=true';
--- for GPDB 7
-SET default_table_access_method='ao_row';
-ERROR:  unrecognized configuration parameter "default_table_access_method"
+-- start_matchsubs
+-- m/CREATE EXTENSION$/
+-- s/CREATE EXTENSION$/CREATE/
+-- m/DROP EXTENSION$/
+-- s/DROP EXTENSION$/DROP/
+-- end_matchsubs
 CREATE EXTENSION diskquota;
 DROP EXTENSION diskquota;
--- for GPDB 6
-SET gp_default_storage_options='appendonly=false';
--- for GPDB 7
-SET default_table_access_method='heap';
-ERROR:  unrecognized configuration parameter "default_table_access_method"
 CREATE EXTENSION diskquota;
 SELECT diskquota.init_table_size_table();
  init_table_size_table 
