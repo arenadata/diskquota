@@ -1,12 +1,5 @@
 -- check that diskquota ignores global flag appendonly=true
 
--- start_matchsubs
--- m/CREATE EXTENSION$/
--- s/CREATE EXTENSION$/CREATE/
--- m/DROP EXTENSION$/
--- s/DROP EXTENSION$/DROP/
--- end_matchsubs
-
 -- start_ignore
 SELECT CASE
     WHEN current_setting('server_version_num')::int > 120000

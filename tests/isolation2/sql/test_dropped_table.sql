@@ -1,18 +1,5 @@
 -- Ensure diskquota does not save information about dropped table during restart cluster by invalidates it at startup
 
--- start_matchsubs
--- m/CREATE SCHEMA/
--- s/CREATE SCHEMA/CREATE/
--- m/CREATE TABLE/
--- s/CREATE TABLE/CREATE/
--- m/INSERT 0 \d+/
--- s/INSERT 0 (\d+)/INSERT $1/
--- m/DROP SCHEMA/
--- s/DROP SCHEMA/DROP/
--- m/DROP TABLE/
--- s/DROP TABLE/DROP/
--- end_matchsubs
-
 1: CREATE SCHEMA dropped_schema;
 1: SET search_path TO dropped_schema;
 1: SELECT diskquota.set_schema_quota('dropped_schema', '1 MB');
