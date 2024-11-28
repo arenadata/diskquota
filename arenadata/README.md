@@ -5,6 +5,7 @@ How to build Docker image: (["readme.md"](https://github.com/arenadata/gpdb/blob
 
 ## Supported GPDB images
 
+- `hub.adsw.io/library/gpdb6_regress:latest`
 - `hub.adsw.io/library/gpdb6_u22:latest`
 - `hub.adsw.io/library/gpdb7_u22:latest`
 
