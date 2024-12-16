@@ -1047,10 +1047,10 @@ pull_active_table_size_from_seg(HTAB *local_table_stats_map)
 		SPI_freetuptable(SPI_tuptable);
 	} while (SPI_processed);
 
+	pfree(DatumGetPointer(tableid));
 	SPI_cursor_close(portal);
 	SPI_freeplan(plan);
 	SPI_finish_if(connected_in_this_function);
-	pfree(DatumGetPointer(tableid));
 
 	return active_oids;
 }

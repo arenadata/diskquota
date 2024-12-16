@@ -1415,11 +1415,11 @@ dispatch_rejectmap(ArrayBuildState *active_oids)
 	                            : PointerGetDatum(construct_empty_array(OIDOID));
 	bool  connected_in_this_function = SPI_connect_if_not_yet();
 	int   ret = SPI_execute_with_args(sql.data, 1, (Oid[]){OIDARRAYOID}, (Datum[]){tableid}, NULL, false, 0);
+	pfree(DatumGetPointer(tableid));
 	ereportif(ret != SPI_OK_SELECT, ERROR,
 	          (errcode(ERRCODE_INTERNAL_ERROR),
 	           errmsg("[diskquota] diskquota.refresh_rejectmap SPI_execute failed: error code %d", ret)));
 	SPI_finish_if(connected_in_this_function);
-	pfree(DatumGetPointer(tableid));
 	pfree(sql.data);
 }
 
