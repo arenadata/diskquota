@@ -979,7 +979,8 @@ pull_active_list_from_seg(void)
 	Portal           portal;
 	/* first get all oid of tables which are active table on any segment */
 	static const char *sql =
-	        "select (diskquota.diskquota_fetch_table_stat(0, '{}'::oid[])).* from gp_dist_random('gp_id') group by 1";
+	        "with s as (select (diskquota.diskquota_fetch_table_stat(0, '{}'::oid[])).* from gp_dist_random('gp_id')) "
+	        "select \"TABLE_OID\" from s group by 1";
 	bool connected_in_this_function = SPI_connect_if_not_yet();
 
 	if ((plan = SPI_prepare(sql, 0, NULL)) == NULL)
