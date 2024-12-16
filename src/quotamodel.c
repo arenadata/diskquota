@@ -1105,13 +1105,13 @@ calculate_table_disk_usage(HTAB *local_active_table_stat_map)
 			{
 				active_table_entry = (ActiveTableEntryCombined *)hash_search(local_active_table_stat_map, &relOid,
 				                                                             HASH_FIND, &active_tbl_found);
+				/* skip to recalculate the tables which are not in active list */
+				if (active_tbl_found && active_table_entry != NULL)
+				{
+					update_active_table_size(relOid, active_table_entry->tablesize[cur_segid + 1], cur_segid, tsentry);
+				}
 			}
 
-			/* skip to recalculate the tables which are not in active list */
-			if (active_tbl_found)
-			{
-				update_active_table_size(relOid, active_table_entry->tablesize[cur_segid + 1], cur_segid, tsentry);
-			}
 			/* table size info doesn't need to flush at init quota model stage */
 			if (local_active_table_stat_map == NULL)
 			{
