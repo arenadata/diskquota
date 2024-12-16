@@ -968,7 +968,7 @@ pull_active_list_from_seg(void)
 	Portal           portal;
 	/* first get all oid of tables which are active table on any segment */
 	static const char *sql =
-	        "select (diskquota.diskquota_fetch_table_stat(0, '{}'::oid[])).* tableid from gp_dist_random('gp_id')";
+	        "select (diskquota.diskquota_fetch_table_stat(0, '{}'::oid[])).* from gp_dist_random('gp_id') group by 1";
 	bool connected_in_this_function = SPI_connect_if_not_yet();
 
 	if ((plan = SPI_prepare(sql, 0, NULL)) == NULL)
@@ -984,7 +984,7 @@ pull_active_list_from_seg(void)
 		{
 			HeapTuple val     = SPI_tuptable->vals[row];
 			TupleDesc tupdesc = SPI_tuptable->tupdesc;
-			Oid       tableid = DatumGetObjectId(SPI_getbinval_wrapper(val, tupdesc, "tableid", false, OIDOID));
+			Oid       tableid = DatumGetObjectId(SPI_getbinval_wrapper(val, tupdesc, "TABLE_OID", false, OIDOID));
 			/* push the active table oid into active_oids array */
 			active_oids = accumArrayResult(active_oids, ObjectIdGetDatum(tableid), false, OIDOID, TopMemoryContext);
 		}
@@ -1033,9 +1033,9 @@ pull_active_table_size_from_seg(HTAB *local_table_stats_map)
 		{
 			HeapTuple val     = SPI_tuptable->vals[row];
 			TupleDesc tupdesc = SPI_tuptable->tupdesc;
-			Oid       tableid = DatumGetObjectId(SPI_getbinval_wrapper(val, tupdesc, "tableid", false, OIDOID));
-			int64     size    = DatumGetInt64(SPI_getbinval_wrapper(val, tupdesc, "size", false, INT8OID));
-			int16     segid   = DatumGetInt64(SPI_getbinval_wrapper(val, tupdesc, "segid", false, INT2OID));
+			Oid       tableid = DatumGetObjectId(SPI_getbinval_wrapper(val, tupdesc, "TABLE_OID", false, OIDOID));
+			int64     size    = DatumGetInt64(SPI_getbinval_wrapper(val, tupdesc, "TABLE_SIZE", false, INT8OID));
+			int16     segid   = DatumGetInt64(SPI_getbinval_wrapper(val, tupdesc, "GP_SEGMENT_ID", false, INT2OID));
 			bool      found;
 			ActiveTableEntryCombined *entry =
 			        (ActiveTableEntryCombined *)hash_search(local_table_stats_map, &tableid, HASH_ENTER, &found);
