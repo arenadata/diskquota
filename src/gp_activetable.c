@@ -953,6 +953,7 @@ load_table_size(void)
 			Assert(nelems == SEGCOUNT + 1);
 			for (int16 segid = -1; segid < SEGCOUNT; segid++)
 				update_active_table_size(tableid, DatumGetInt64(sizes[segid + 1]), segid, NULL);
+			pfree(sizes);
 		}
 		SPI_freetuptable(SPI_tuptable);
 	} while (SPI_processed);
