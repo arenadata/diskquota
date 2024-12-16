@@ -1000,13 +1000,11 @@ update_active_table_size(Oid tableid, int64 size, int16 segid, void *arg)
 static void
 calculate_table_disk_usage(HTAB *local_active_table_stat_map)
 {
-	bool                      active_tbl_found;
-	TableSizeEntry           *tsentry = NULL;
-	Oid                       relOid;
-	HASH_SEQ_STATUS           iter;
-	ActiveTableEntryCombined *active_table_entry;
-	List                     *oidlist;
-	ListCell                 *l;
+	TableSizeEntry *tsentry = NULL;
+	Oid             relOid;
+	HASH_SEQ_STATUS iter;
+	List           *oidlist;
+	ListCell       *l;
 	DeleteArrays delete = {0};
 
 	/*
@@ -1103,8 +1101,9 @@ calculate_table_disk_usage(HTAB *local_active_table_stat_map)
 
 			if (local_active_table_stat_map != NULL)
 			{
-				active_table_entry = (ActiveTableEntryCombined *)hash_search(local_active_table_stat_map, &relOid,
-				                                                             HASH_FIND, &active_tbl_found);
+				bool                      active_tbl_found;
+				ActiveTableEntryCombined *active_table_entry = (ActiveTableEntryCombined *)hash_search(
+				        local_active_table_stat_map, &relOid, HASH_FIND, &active_tbl_found);
 				/* skip to recalculate the tables which are not in active list */
 				if (active_tbl_found && active_table_entry != NULL)
 				{
