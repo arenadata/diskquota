@@ -925,8 +925,7 @@ get_tsentry(Oid tableid, int16 segid)
 
 	if (!table_size_map_found && tsentry != NULL)
 	{
-		// tsentry->key = key;
-		// Assert(TableSizeEntrySegidStart(tsentry) == segid);
+		Assert(TableSizeEntrySegidStart(tsentry) == segid);
 		memset(tsentry->totalsize, 0, sizeof(tsentry->totalsize));
 		tsentry->owneroid      = InvalidOid;
 		tsentry->namespaceoid  = InvalidOid;
