@@ -47,6 +47,8 @@
 /* max number of QuotaInfoEntry in quota_info_map */
 #define MAX_QUOTA_MAP_ENTRIES (AVG_QUOTA_MAP_ENTRIES < 1024 ? 1024 : AVG_QUOTA_MAP_ENTRIES)
 
+#define DatumGetArrayTypePwrapper(X) ((X) ? DatumGetArrayTypeP(X) : NULL)
+
 typedef enum
 {
 	DISKQUOTA_TAG_HASH = 0,

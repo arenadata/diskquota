@@ -919,11 +919,16 @@ get_active_tables_oid(void)
 static ArrayBuildState *
 load_table_size(void)
 {
-	ArrayBuildState   *active_oids = NULL;
-	SPIPlanPtr         plan;
-	Portal             portal;
-	static const char *sql                        = "select tableid, size, segid from diskquota.table_size";
+	ArrayBuildState *active_oids = NULL;
+	SPIPlanPtr       plan;
+	Portal           portal;
+	int16            typlen;
+	bool             typbyval;
+	char             typalign;
+	static const char *sql = "select tableid, array_agg(size order by segid) size from diskquota.table_size group by 1";
 	bool               connected_in_this_function = SPI_connect_if_not_yet();
+
+	get_typlenbyvalalign(INT8OID, &typlen, &typbyval, &typalign);
 
 	if ((plan = SPI_prepare(sql, 0, NULL)) == NULL)
 		ereport(ERROR, (errmsg("[diskquota] SPI_prepare(\"%s\") failed", sql)));
@@ -935,14 +940,18 @@ load_table_size(void)
 		SPI_cursor_fetch(portal, true, 10000);
 		for (uint64 row = 0; row < SPI_processed; row++)
 		{
-			HeapTuple val     = SPI_tuptable->vals[row];
-			TupleDesc tupdesc = SPI_tuptable->tupdesc;
-			Oid       tableid = DatumGetObjectId(SPI_getbinval_wrapper(val, tupdesc, "tableid", false, OIDOID));
-			int64     size    = DatumGetInt64(SPI_getbinval_wrapper(val, tupdesc, "size", false, INT8OID));
-			int16     segid   = DatumGetInt64(SPI_getbinval_wrapper(val, tupdesc, "segid", false, INT2OID));
-
+			HeapTuple  val     = SPI_tuptable->vals[row];
+			TupleDesc  tupdesc = SPI_tuptable->tupdesc;
+			Oid        tableid = DatumGetObjectId(SPI_getbinval_wrapper(val, tupdesc, "tableid", false, OIDOID));
+			ArrayType *array =
+			        DatumGetArrayTypePwrapper(SPI_getbinval_wrapper(val, tupdesc, "size", false, INT8ARRAYOID));
+			Datum *sizes;
+			int    nelems;
 			active_oids = accumArrayResult(active_oids, ObjectIdGetDatum(tableid), false, OIDOID, TopMemoryContext);
-			update_active_table_size(tableid, size, segid, NULL);
+			deconstruct_array(array, ARR_ELEMTYPE(array), typlen, typbyval, typalign, &sizes, NULL, &nelems);
+			Assert(nelems == SEGCOUNT + 1);
+			for (int16 segid = -1; segid < nelems - 1; segid++)
+				update_active_table_size(tableid, DatumGetInt64(sizes[segid + 1]), segid, NULL);
 		}
 		SPI_freetuptable(SPI_tuptable);
 	} while (SPI_processed);
