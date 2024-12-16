@@ -14,6 +14,7 @@
 #define ACTIVE_TABLE_H
 
 #include "c.h"
+#include "utils/array.h"
 #include "utils/hsearch.h"
 
 /* Cache to detect the active table list */
@@ -47,10 +48,12 @@ typedef struct ActiveTableEntryCombined
 	Size tablesize[1];
 } ActiveTableEntryCombined;
 
-extern HTAB *gp_fetch_active_tables(bool force);
-extern void  init_active_table_hook(void);
-extern void  init_shm_worker_active_tables(void);
-extern void  init_lock_active_tables(void);
+extern ArrayBuildState *gp_fetch_active_tables(HTAB *local_active_table_stat_map);
+
+extern void init_active_table_hook(void);
+extern void init_shm_worker_active_tables(void);
+extern void init_lock_active_tables(void);
+extern void update_active_table_size(Oid tableid, int64 size, int16 segid, void *arg);
 
 extern HTAB *monitored_dbid_cache;
 

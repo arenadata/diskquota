@@ -17,6 +17,7 @@
 #include "postgres.h"
 #include "port/atomics.h"
 
+#include "access/htup.h"
 #include "catalog/pg_class.h"
 #include "lib/ilist.h"
 #include "lib/stringinfo.h"
@@ -321,4 +322,5 @@ extern HASHACTION check_hash_fullness(HTAB *hashp, int max_size, const char *war
                                       TimestampTz *last_overflow_report);
 bool              SPI_connect_if_not_yet(void);
 void              SPI_finish_if(bool connected_in_this_function);
+Datum SPI_getbinval_wrapper(HeapTuple tuple, TupleDesc tupdesc, const char *fname, bool allow_null, Oid typeid);
 #endif
