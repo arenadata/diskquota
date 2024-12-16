@@ -919,12 +919,13 @@ get_active_tables_oid(void)
 static ArrayBuildState *
 load_table_size(void)
 {
-	ArrayBuildState *active_oids = NULL;
-	SPIPlanPtr       plan;
-	Portal           portal;
-	int16            typlen;
-	bool             typbyval;
-	char             typalign;
+	SPIPlanPtr plan;
+	Portal     portal;
+	int16      typlen;
+	bool       typbyval;
+	char       typalign;
+
+	ArrayBuildState   *active_oids = NULL;
 	static const char *sql = "select tableid, array_agg(size order by segid) size from diskquota.table_size group by 1";
 	bool               connected_in_this_function = SPI_connect_if_not_yet();
 
@@ -950,7 +951,7 @@ load_table_size(void)
 			active_oids = accumArrayResult(active_oids, ObjectIdGetDatum(tableid), false, OIDOID, TopMemoryContext);
 			deconstruct_array(array, ARR_ELEMTYPE(array), typlen, typbyval, typalign, &sizes, NULL, &nelems);
 			Assert(nelems == SEGCOUNT + 1);
-			for (int16 segid = -1; segid < nelems - 1; segid++)
+			for (int16 segid = -1; segid < SEGCOUNT; segid++)
 				update_active_table_size(tableid, DatumGetInt64(sizes[segid + 1]), segid, NULL);
 		}
 		SPI_freetuptable(SPI_tuptable);
