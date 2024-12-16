@@ -1087,7 +1087,7 @@ calculate_table_disk_usage(HTAB *local_active_table_stat_map)
 		 */
 		for (int cur_segid = -1; cur_segid < SEGCOUNT; cur_segid++)
 		{
-			TableSizeEntry *tsentry = get_tsentry(relOid, cur_segid);
+			tsentry = get_tsentry(relOid, cur_segid);
 
 			if (tsentry == NULL)
 			{
