@@ -1407,11 +1407,11 @@ dispatch_rejectmap(const char *active_oids)
 	                 "ARRAY[%s]::diskquota.rejectmap_entry[], "
 	                 "ARRAY[%s]::oid[])",
 	                 rows.data, active_oids);
-	pfree(rows.data);
-	pfree(sql.data);
 
 	CdbDispatchCommand(sql.data, DF_NONE, &cdb_pgresults);
 
+	pfree(rows.data);
+	pfree(sql.data);
 	cdbdisp_clearCdbPgResults(&cdb_pgresults);
 }
 
