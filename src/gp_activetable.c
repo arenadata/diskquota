@@ -1082,7 +1082,7 @@ pull_active_table_size_from_seg(HTAB *local_table_stats_map)
 	int            j;
 
 	initStringInfo(&sql_command);
-	appendStringInfo(&sql_command, "select * from diskquota.diskquota_fetch_table_stat(1, '{%s}'::oid[])",
+	appendStringInfo(&sql_command, "select * from diskquota.diskquota_fetch_table_stat(1, ARRAY[%s]::oid[])",
 	                 active_oids.data);
 	CdbDispatchCommand(sql_command.data, DF_NONE, &cdb_pgresults);
 	pfree(sql_command.data);
