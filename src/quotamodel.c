@@ -930,9 +930,9 @@ get_tsentry(Oid tableid, int16 segid)
 }
 
 void
-update_active_table_size(Oid tableid, int64 size, int16 segid, void *arg)
+update_active_table_size(Oid tableid, int64 size, int16 segid)
 {
-	TableSizeEntry *tsentry = arg != NULL ? arg : get_tsentry(tableid, segid);
+	TableSizeEntry *tsentry = get_tsentry(tableid, segid);
 
 	if (tsentry == NULL)
 	{

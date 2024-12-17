@@ -955,7 +955,7 @@ load_table_size(StringInfoData *active_oids)
 			deconstruct_array(array, ARR_ELEMTYPE(array), typlen, typbyval, typalign, &sizes, NULL, &nelems);
 			Assert(nelems == SEGCOUNT + 1);
 			for (int16 segid = -1; segid < SEGCOUNT; segid++)
-				update_active_table_size(tableid, DatumGetInt64(sizes[segid + 1]), segid, NULL);
+				update_active_table_size(tableid, DatumGetInt64(sizes[segid + 1]), segid);
 			pfree(sizes);
 		}
 		SPI_freetuptable(SPI_tuptable);
@@ -1086,12 +1086,11 @@ pull_active_table_size_from_seg(const char *active_oids)
 			int64 size  = atoll(PQgetvalue(pgresult, j, 1));
 			int16 segid = atoi(PQgetvalue(pgresult, j, 2));
 
-			update_active_table_size(oid, size, segid, NULL);
+			update_active_table_size(oid, size, segid);
 			oid_size = hash_search(oid_size_map, &oid, HASH_ENTER, &found);
 			/* tablesize for master is the sum of tablesize of master and all segments */
 			oid_size->size = (found ? oid_size->size : 0) + size;
 		}
-		// update_active_table_size(tableid0, size0, -1, NULL);
 	}
 	cdbdisp_clearCdbPgResults(&cdb_pgresults);
 
@@ -1101,7 +1100,7 @@ pull_active_table_size_from_seg(const char *active_oids)
 
 	while ((oid_size = hash_seq_search(&iter)) != NULL)
 	{
-		update_active_table_size(oid_size->oid, oid_size->size, -1, NULL);
+		update_active_table_size(oid_size->oid, oid_size->size, -1);
 	}
 
 	hash_destroy(oid_size_map);
