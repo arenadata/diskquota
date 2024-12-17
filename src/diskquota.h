@@ -17,6 +17,7 @@
 #include "postgres.h"
 #include "port/atomics.h"
 
+#include "access/htup.h"
 #include "catalog/pg_class.h"
 #include "lib/ilist.h"
 #include "lib/stringinfo.h"
@@ -45,6 +46,8 @@
 #define AVG_QUOTA_MAP_ENTRIES (diskquota_max_quota_probes / diskquota_max_monitored_databases)
 /* max number of QuotaInfoEntry in quota_info_map */
 #define MAX_QUOTA_MAP_ENTRIES (AVG_QUOTA_MAP_ENTRIES < 1024 ? 1024 : AVG_QUOTA_MAP_ENTRIES)
+
+#define DatumGetArrayTypePwrapper(X) ((X) ? DatumGetArrayTypeP(X) : NULL)
 
 typedef enum
 {
@@ -321,4 +324,5 @@ extern HASHACTION check_hash_fullness(HTAB *hashp, int max_size, const char *war
                                       TimestampTz *last_overflow_report);
 bool              SPI_connect_if_not_yet(void);
 void              SPI_finish_if(bool connected_in_this_function);
+Datum SPI_getbinval_wrapper(HeapTuple tuple, TupleDesc tupdesc, const char *fname, bool allow_null, Oid typeid);
 #endif
