@@ -1054,13 +1054,13 @@ pull_active_table_size_from_seg(const char *active_oids)
 		Oid   oid;
 		int64 size;
 	} * oid_size;
-	HASHCTL ctl          = {.keysize = sizeof(Oid), .entrysize = sizeof(*oid_size), .hcxt = CurrentMemoryContext};
-	HTAB   *oid_size_map = diskquota_hash_create("local active table map with size info", 1024, &ctl,
-	                                             HASH_ELEM | HASH_CONTEXT, DISKQUOTA_OID_HASH);
+	HASHCTL ctl = {.keysize = sizeof(Oid), .entrysize = sizeof(*oid_size), .hcxt = CurrentMemoryContext};
+	HTAB   *map = diskquota_hash_create("local active table map with size info", 1024, &ctl, HASH_ELEM | HASH_CONTEXT,
+	                                    DISKQUOTA_OID_HASH);
 
-	for (int i = 0; i < cdb_pgresults.numResults; i++)
+	for (int segid = 0; segid < cdb_pgresults.numResults; segid++)
 	{
-		PGresult *pgresult = cdb_pgresults.pg_results[i];
+		PGresult *pgresult = cdb_pgresults.pg_results[segid];
 
 		if (PQresultStatus(pgresult) != PGRES_TUPLES_OK)
 		{
@@ -1072,12 +1072,11 @@ pull_active_table_size_from_seg(const char *active_oids)
 		for (int row = 0; row < PQntuples(pgresult); row++)
 		{
 			bool  found;
-			Oid   oid   = atooid(PQgetvalue(pgresult, row, 0));
-			int64 size  = atoll(PQgetvalue(pgresult, row, 1));
-			int16 segid = atoi(PQgetvalue(pgresult, row, 2));
+			Oid   oid  = atooid(PQgetvalue(pgresult, row, 0));
+			int64 size = atoll(PQgetvalue(pgresult, row, 1));
 
 			update_active_table_size(oid, size, segid);
-			oid_size = hash_search(oid_size_map, &oid, HASH_ENTER, &found);
+			oid_size = hash_search(map, &oid, HASH_ENTER, &found);
 			/* tablesize for master is the sum of tablesize of master and all segments */
 			oid_size->size = (found ? oid_size->size : 0) + size;
 		}
@@ -1086,12 +1085,12 @@ pull_active_table_size_from_seg(const char *active_oids)
 
 	HASH_SEQ_STATUS iter;
 
-	hash_seq_init(&iter, oid_size_map);
+	hash_seq_init(&iter, map);
 
 	while ((oid_size = hash_seq_search(&iter)) != NULL)
 	{
 		update_active_table_size(oid_size->oid, oid_size->size, -1);
 	}
 
-	hash_destroy(oid_size_map);
+	hash_destroy(map);
 }
