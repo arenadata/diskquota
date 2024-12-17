@@ -223,7 +223,7 @@ static void refresh_disk_quota_usage(bool is_init);
 static void calculate_table_disk_usage(HTAB *local_table_stats_map);
 static void flush_to_table_size(void);
 static bool flush_local_reject_map(void);
-static void dispatch_rejectmap(StringInfoData *active_oids);
+static void dispatch_rejectmap(const char *active_oids);
 static bool load_quotas(void);
 static void do_load_quotas(void);
 
@@ -860,7 +860,7 @@ refresh_disk_quota_usage(bool is_init)
 		 * not empty the rejectmap should be dispatched to segments.
 		 */
 		if (is_init || (diskquota_hardlimit && (reject_map_changed || active_oids.len > 0)))
-			dispatch_rejectmap(&active_oids);
+			dispatch_rejectmap(active_oids.data);
 	}
 	PG_CATCH();
 	{
@@ -1384,7 +1384,7 @@ flush_local_reject_map(void)
  * Dispatch rejectmap to segment servers.
  */
 static void
-dispatch_rejectmap(StringInfoData *active_oids)
+dispatch_rejectmap(const char *active_oids)
 {
 	HASH_SEQ_STATUS       hash_seq;
 	GlobalRejectMapEntry *rejectmap_entry;
@@ -1410,7 +1410,7 @@ dispatch_rejectmap(StringInfoData *active_oids)
 	                 "select diskquota.refresh_rejectmap("
 	                 "ARRAY[%s]::diskquota.rejectmap_entry[], "
 	                 "ARRAY[%s]::oid[])",
-	                 rows.data, active_oids->data);
+	                 rows.data, active_oids);
 	pfree(rows.data);
 	pfree(sql.data);
 
