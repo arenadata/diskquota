@@ -364,11 +364,11 @@ remove_from_active_table_map(const RelFileNodeBackend *relFileNode)
  * to get the real table size at cluster level.
  */
 void
-gp_fetch_active_tables(StringInfoData *active_oids, HTAB *local_active_table_stat_map)
+gp_fetch_active_tables(StringInfoData *active_oids, HTAB *local_table_stats_map)
 {
 	Assert(Gp_role == GP_ROLE_DISPATCH);
 
-	if (local_active_table_stat_map == NULL)
+	if (local_table_stats_map == NULL)
 	{
 		load_table_size(active_oids);
 	}
@@ -384,7 +384,7 @@ gp_fetch_active_tables(StringInfoData *active_oids, HTAB *local_active_table_sta
 		        (errcode(ERRCODE_INTERNAL_ERROR), errmsg("[diskquota] active_old_list = %s", active_oids->data)));
 
 		/* step 2: fetch active table sizes based on active oids */
-		pull_active_table_size_from_seg(active_oids, local_active_table_stat_map);
+		pull_active_table_size_from_seg(active_oids, local_table_stats_map);
 	}
 }
 
