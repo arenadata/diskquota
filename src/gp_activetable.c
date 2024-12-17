@@ -923,15 +923,10 @@ load_table_size(StringInfoData *active_oids)
 {
 	SPIPlanPtr plan;
 	Portal     portal;
-	int16      typlen;
-	bool       typbyval;
-	char       typalign;
 
-	static const char *sql = "select tableid, array_agg(size order by segid) size from diskquota.table_size group by 1";
+	static const char *sql = "select tableid, size, segid from diskquota.table_size";
 
 	bool connected_in_this_function = SPI_connect_if_not_yet();
-
-	get_typlenbyvalalign(INT8OID, &typlen, &typbyval, &typalign);
 
 	if ((plan = SPI_prepare(sql, 0, NULL)) == NULL)
 		ereport(ERROR, (errmsg("[diskquota] SPI_prepare(\"%s\") failed", sql)));
@@ -943,20 +938,19 @@ load_table_size(StringInfoData *active_oids)
 		SPI_cursor_fetch(portal, true, 10000);
 		for (uint64 row = 0; row < SPI_processed; row++)
 		{
-			HeapTuple  val     = SPI_tuptable->vals[row];
-			TupleDesc  tupdesc = SPI_tuptable->tupdesc;
-			Oid        tableid = DatumGetObjectId(SPI_getbinval_wrapper(val, tupdesc, "tableid", false, OIDOID));
-			ArrayType *array =
-			        DatumGetArrayTypePwrapper(SPI_getbinval_wrapper(val, tupdesc, "size", false, INT8ARRAYOID));
-			Datum *sizes;
-			int    nelems;
-			if (active_oids->len > 0) appendStringInfoString(active_oids, ",");
-			appendStringInfo(active_oids, "%d", tableid);
-			deconstruct_array(array, ARR_ELEMTYPE(array), typlen, typbyval, typalign, &sizes, NULL, &nelems);
-			Assert(nelems == SEGCOUNT + 1);
-			for (int16 segid = -1; segid < SEGCOUNT; segid++)
-				update_active_table_size(tableid, DatumGetInt64(sizes[segid + 1]), segid);
-			pfree(sizes);
+			HeapTuple val     = SPI_tuptable->vals[row];
+			TupleDesc tupdesc = SPI_tuptable->tupdesc;
+			Oid       oid     = DatumGetObjectId(SPI_getbinval_wrapper(val, tupdesc, "tableid", false, OIDOID));
+			int64     size    = DatumGetObjectId(SPI_getbinval_wrapper(val, tupdesc, "size", false, INT8OID));
+			int16     segid   = DatumGetObjectId(SPI_getbinval_wrapper(val, tupdesc, "segid", false, INT2OID));
+
+			update_active_table_size(oid, size, segid);
+
+			if (segid == -1)
+			{
+				if (active_oids->len > 0) appendStringInfoString(active_oids, ",");
+				appendStringInfo(active_oids, "%d", oid);
+			}
 		}
 		SPI_freetuptable(SPI_tuptable);
 	} while (SPI_processed);
