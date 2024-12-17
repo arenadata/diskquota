@@ -89,8 +89,8 @@ static void object_access_hook_QuotaStmt(ObjectAccessType access, Oid classId, O
 static HTAB *get_active_tables_stats(ArrayType *array);
 static HTAB *get_active_tables_oid(void);
 static HTAB *pull_active_list_from_seg(void);
-static void  pull_active_table_size_from_seg(StringInfoData *active_oids, HTAB *local_table_stats_map);
-static void  convert_map_to_string(StringInfoData *active_oids, HTAB *active_list);
+static void  pull_active_table_size_from_seg(HTAB *local_table_stats_map, StringInfoData *active_oids);
+static void  convert_map_to_string(HTAB *local_table_oid_map, StringInfoData *active_oids);
 static void  load_table_size(StringInfoData *active_oids);
 static void  report_active_table_helper(const RelFileNodeBackend *relFileNode);
 static void  remove_from_active_table_map(const RelFileNodeBackend *relFileNode);
@@ -375,16 +375,16 @@ gp_fetch_active_tables(StringInfoData *active_oids, HTAB *local_table_stats_map)
 	else
 	{
 		/* step 1: fetch active oids from all the segments */
-		HTAB *local_active_table_oid_maps = pull_active_list_from_seg();
+		HTAB *local_table_oid_map = pull_active_list_from_seg();
 
-		convert_map_to_string(active_oids, local_active_table_oid_maps);
-		hash_destroy(local_active_table_oid_maps);
+		convert_map_to_string(local_table_oid_map, active_oids);
+		hash_destroy(local_table_oid_map);
 
 		ereport(DEBUG1,
 		        (errcode(ERRCODE_INTERNAL_ERROR), errmsg("[diskquota] active_old_list = %s", active_oids->data)));
 
 		/* step 2: fetch active table sizes based on active oids */
-		pull_active_table_size_from_seg(active_oids, local_table_stats_map);
+		pull_active_table_size_from_seg(local_table_stats_map, active_oids);
 	}
 }
 
@@ -975,12 +975,12 @@ load_table_size(StringInfoData *active_oids)
  * of function diskquota_fetch_table_stat.
  */
 static void
-convert_map_to_string(StringInfoData *active_oids, HTAB *local_active_table_oid_maps)
+convert_map_to_string(HTAB *local_table_oid_map, StringInfoData *active_oids)
 {
 	HASH_SEQ_STATUS            iter;
 	DiskQuotaActiveTableEntry *entry;
 
-	hash_seq_init(&iter, local_active_table_oid_maps);
+	hash_seq_init(&iter, local_table_oid_map);
 
 	while ((entry = (DiskQuotaActiveTableEntry *)hash_seq_search(&iter)) != NULL)
 	{
@@ -1061,7 +1061,7 @@ pull_active_list_from_seg(void)
  * table size on all of the segments.
  */
 static void
-pull_active_table_size_from_seg(StringInfoData *active_oids, HTAB *local_table_stats_map)
+pull_active_table_size_from_seg(HTAB *local_table_stats_map, StringInfoData *active_oids)
 {
 	CdbPgResults   cdb_pgresults = {NULL, 0};
 	StringInfoData sql_command;
