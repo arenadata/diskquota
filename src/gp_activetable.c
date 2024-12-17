@@ -88,7 +88,7 @@ static void object_access_hook_QuotaStmt(ObjectAccessType access, Oid classId, O
 
 static HTAB *get_active_tables_stats(ArrayType *array);
 static HTAB *get_active_tables_oid(void);
-static HTAB *pull_active_list_from_seg(void);
+static void  pull_active_list_from_seg(StringInfoData *active_oids);
 static void  pull_active_table_size_from_seg(HTAB *local_table_stats_map, const char *active_oids);
 static void  convert_map_to_string(HTAB *oid_map, StringInfoData *active_oids);
 static void  load_table_size(StringInfoData *active_oids);
@@ -375,10 +375,7 @@ gp_fetch_active_tables(StringInfoData *active_oids, HTAB *local_table_stats_map)
 	else
 	{
 		/* step 1: fetch active oids from all the segments */
-		HTAB *oid_map = pull_active_list_from_seg();
-
-		convert_map_to_string(oid_map, active_oids);
-		hash_destroy(oid_map);
+		pull_active_list_from_seg(active_oids);
 
 		ereport(DEBUG1,
 		        (errcode(ERRCODE_INTERNAL_ERROR), errmsg("[diskquota] active_old_list = %s", active_oids->data)));
@@ -995,8 +992,8 @@ convert_map_to_string(HTAB *oid_map, StringInfoData *active_oids)
  * Function diskquota_fetch_table_stat is called to calculate
  * the table size on the fly.
  */
-static HTAB *
-pull_active_list_from_seg(void)
+static void
+pull_active_list_from_seg(StringInfoData *active_oids)
 {
 	CdbPgResults cdb_pgresults = {NULL, 0};
 	HASHCTL      ctl           = {.keysize = sizeof(Oid), .entrysize = sizeof(Oid), .hcxt = CurrentMemoryContext};
@@ -1028,7 +1025,8 @@ pull_active_list_from_seg(void)
 	}
 	cdbdisp_clearCdbPgResults(&cdb_pgresults);
 
-	return oid_map;
+	convert_map_to_string(oid_map, active_oids);
+	hash_destroy(oid_map);
 }
 
 /*
