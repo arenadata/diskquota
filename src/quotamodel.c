@@ -223,7 +223,7 @@ static void refresh_disk_quota_usage(bool is_init);
 static void calculate_table_disk_usage(HTAB *local_active_table_stat_map);
 static void flush_to_table_size(void);
 static bool flush_local_reject_map(void);
-static void dispatch_rejectmap(StringInfoData active_oids);
+static void dispatch_rejectmap(StringInfoData *active_oids);
 static bool load_quotas(void);
 static void do_load_quotas(void);
 
@@ -812,9 +812,10 @@ refresh_disk_quota_usage(bool is_init)
 	volatile bool pushed_active_snap           = false;
 	volatile bool ret                          = true;
 	HTAB *volatile local_active_table_stat_map = NULL;
-	StringInfoData volatile active_oids        = {0};
+	StringInfoData active_oids;
 
 	StartTransactionCommand();
+	initStringInfo(&active_oids);
 
 	/*
 	 * Cache Errors during SPI functions, for example a segment may be down
@@ -842,7 +843,7 @@ refresh_disk_quota_usage(bool is_init)
 			local_active_table_stat_map = diskquota_hash_create("local active table map with relfilenode info", 1024,
 			                                                    &ctl, HASH_ELEM | HASH_CONTEXT, DISKQUOTA_OID_HASH);
 		}
-		active_oids = gp_fetch_active_tables(local_active_table_stat_map);
+		gp_fetch_active_tables(&active_oids, local_active_table_stat_map);
 		/* TODO: if we can skip the following steps when there is no active table */
 		/* recalculate the disk usage of table, schema and role */
 		calculate_table_disk_usage(local_active_table_stat_map);
@@ -859,7 +860,7 @@ refresh_disk_quota_usage(bool is_init)
 		 * not empty the rejectmap should be dispatched to segments.
 		 */
 		if (is_init || (diskquota_hardlimit && (reject_map_changed || active_oids.len > 0)))
-			dispatch_rejectmap(active_oids);
+			dispatch_rejectmap(&active_oids);
 	}
 	PG_CATCH();
 	{
@@ -1383,7 +1384,7 @@ flush_local_reject_map(void)
  * Dispatch rejectmap to segment servers.
  */
 static void
-dispatch_rejectmap(StringInfoData active_oids)
+dispatch_rejectmap(StringInfoData *active_oids)
 {
 	HASH_SEQ_STATUS       hash_seq;
 	GlobalRejectMapEntry *rejectmap_entry;
@@ -1409,7 +1410,7 @@ dispatch_rejectmap(StringInfoData active_oids)
 	                 "select diskquota.refresh_rejectmap("
 	                 "ARRAY[%s]::diskquota.rejectmap_entry[], "
 	                 "ARRAY[%s]::oid[])",
-	                 rows.data, active_oids.data);
+	                 rows.data, active_oids->data);
 	pfree(rows.data);
 	pfree(sql.data);
 

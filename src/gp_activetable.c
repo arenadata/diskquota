@@ -89,10 +89,10 @@ static void object_access_hook_QuotaStmt(ObjectAccessType access, Oid classId, O
 static HTAB *get_active_tables_stats(ArrayType *array);
 static HTAB *get_active_tables_oid(void);
 
-static StringInfoData pull_active_list_from_seg(void);
-static StringInfoData pull_active_table_size_from_seg(HTAB *local_table_stats_map);
-static StringInfoData convert_map_to_string(HTAB *active_list);
-static StringInfoData load_table_size(void);
+static void pull_active_list_from_seg(StringInfoData *active_oids);
+static void pull_active_table_size_from_seg(StringInfoData *active_oids, HTAB *local_table_stats_map);
+static void convert_map_to_string(StringInfoData *active_oids, HTAB *active_list);
+static void load_table_size(StringInfoData *active_oids);
 
 static void report_active_table_helper(const RelFileNodeBackend *relFileNode);
 static void remove_from_active_table_map(const RelFileNodeBackend *relFileNode);
@@ -365,8 +365,8 @@ remove_from_active_table_map(const RelFileNodeBackend *relFileNode)
  * And aggregate the table size on each segment
  * to get the real table size at cluster level.
  */
-StringInfoData
-gp_fetch_active_tables(HTAB *local_active_table_stat_map)
+void
+gp_fetch_active_tables(StringInfoData *active_oids, HTAB *local_active_table_stat_map)
 {
 	HASHCTL ctl;
 
@@ -379,10 +379,19 @@ gp_fetch_active_tables(HTAB *local_active_table_stat_map)
 
 	if (local_active_table_stat_map == NULL)
 	{
-		return load_table_size();
+		load_table_size(active_oids);
 	}
+	else
+	{
+		/* step 1: fetch active oids from all the segments */
+		pull_active_list_from_seg(active_oids);
 
-	return pull_active_table_size_from_seg(local_active_table_stat_map);
+		ereport(DEBUG1,
+		        (errcode(ERRCODE_INTERNAL_ERROR), errmsg("[diskquota] active_old_list = %s", active_oids->data)));
+
+		/* step 2: fetch active table sizes based on active oids */
+		pull_active_table_size_from_seg(active_oids, local_active_table_stat_map);
+	}
 }
 
 /*
@@ -918,8 +927,8 @@ get_active_tables_oid(void)
  * This is called when system startup, disk quota rejectmap
  * and other shared memory will be warmed up by table_size table.
  */
-static StringInfoData
-load_table_size(void)
+static void
+load_table_size(StringInfoData *active_oids)
 {
 	SPIPlanPtr plan;
 	Portal     portal;
@@ -927,13 +936,10 @@ load_table_size(void)
 	bool       typbyval;
 	char       typalign;
 
-	StringInfoData     active_oids;
 	static const char *sql = "select tableid, array_agg(size order by segid) size from diskquota.table_size group by 1";
-	bool               connected_in_this_function = SPI_connect_if_not_yet();
-	MemoryContext      oldContext                 = MemoryContextSwitchTo(CurTransactionContext);
 
-	initStringInfo(&active_oids);
-	MemoryContextSwitchTo(oldContext);
+	bool connected_in_this_function = SPI_connect_if_not_yet();
+
 	get_typlenbyvalalign(INT8OID, &typlen, &typbyval, &typalign);
 
 	if ((plan = SPI_prepare(sql, 0, NULL)) == NULL)
@@ -953,8 +959,8 @@ load_table_size(void)
 			        DatumGetArrayTypePwrapper(SPI_getbinval_wrapper(val, tupdesc, "size", false, INT8ARRAYOID));
 			Datum *sizes;
 			int    nelems;
-			if (active_oids.len > 0) appendStringInfoString(&active_oids, ",");
-			appendStringInfo(&active_oids, "%d", tableid);
+			if (active_oids->len > 0) appendStringInfoString(active_oids, ",");
+			appendStringInfo(active_oids, "%d", tableid);
 			deconstruct_array(array, ARR_ELEMTYPE(array), typlen, typbyval, typalign, &sizes, NULL, &nelems);
 			Assert(nelems == SEGCOUNT + 1);
 			for (int16 segid = -1; segid < SEGCOUNT; segid++)
@@ -967,8 +973,6 @@ load_table_size(void)
 	SPI_cursor_close(portal);
 	SPI_freeplan(plan);
 	SPI_finish_if(connected_in_this_function);
-
-	return active_oids;
 }
 
 /*
@@ -976,24 +980,19 @@ load_table_size(void)
  * This function is used to prepare the second array parameter
  * of function diskquota_fetch_table_stat.
  */
-static StringInfoData
-convert_map_to_string(HTAB *local_active_table_oid_maps)
+static void
+convert_map_to_string(StringInfoData *active_oids, HTAB *local_active_table_oid_maps)
 {
 	HASH_SEQ_STATUS            iter;
-	StringInfoData             buffer;
 	DiskQuotaActiveTableEntry *entry;
-
-	initStringInfo(&buffer);
 
 	hash_seq_init(&iter, local_active_table_oid_maps);
 
 	while ((entry = (DiskQuotaActiveTableEntry *)hash_seq_search(&iter)) != NULL)
 	{
-		if (buffer.len > 0) appendStringInfoString(&buffer, ",");
-		appendStringInfo(&buffer, "%d", entry->reloid);
+		if (active_oids->len > 0) appendStringInfoString(active_oids, ",");
+		appendStringInfo(active_oids, "%d", entry->reloid);
 	}
-
-	return buffer;
 }
 
 /*
@@ -1002,8 +1001,8 @@ convert_map_to_string(HTAB *local_active_table_oid_maps)
  * Function diskquota_fetch_table_stat is called to calculate
  * the table size on the fly.
  */
-static StringInfoData
-pull_active_list_from_seg(void)
+static void
+pull_active_list_from_seg(StringInfoData *active_oids)
 {
 	CdbPgResults               cdb_pgresults = {NULL, 0};
 	int                        i, j;
@@ -1054,13 +1053,8 @@ pull_active_list_from_seg(void)
 		}
 	}
 	cdbdisp_clearCdbPgResults(&cdb_pgresults);
-
-	MemoryContext  oldContext  = MemoryContextSwitchTo(CurTransactionContext);
-	StringInfoData active_oids = convert_map_to_string(local_active_table_oid_map);
-	MemoryContextSwitchTo(oldContext);
+	convert_map_to_string(active_oids, local_active_table_oid_map);
 	hash_destroy(local_active_table_oid_map);
-
-	return active_oids;
 }
 
 /*
@@ -1072,12 +1066,9 @@ pull_active_list_from_seg(void)
  * memory), so when re-calculate the table size, we need to sum the
  * table size on all of the segments.
  */
-static StringInfoData
-pull_active_table_size_from_seg(HTAB *local_table_stats_map)
+static void
+pull_active_table_size_from_seg(StringInfoData *active_oids, HTAB *local_table_stats_map)
 {
-	/* step 1: fetch active oids from all the segments */
-	StringInfoData active_oids = pull_active_list_from_seg();
-	/* step 2: fetch active table sizes based on active oids */
 	CdbPgResults   cdb_pgresults = {NULL, 0};
 	StringInfoData sql_command;
 	int            i;
@@ -1085,7 +1076,7 @@ pull_active_table_size_from_seg(HTAB *local_table_stats_map)
 
 	initStringInfo(&sql_command);
 	appendStringInfo(&sql_command, "select * from diskquota.diskquota_fetch_table_stat(1, ARRAY[%s]::oid[])",
-	                 active_oids.data);
+	                 active_oids->data);
 	CdbDispatchCommand(sql_command.data, DF_NONE, &cdb_pgresults);
 	pfree(sql_command.data);
 
@@ -1132,5 +1123,4 @@ pull_active_table_size_from_seg(HTAB *local_table_stats_map)
 		}
 	}
 	cdbdisp_clearCdbPgResults(&cdb_pgresults);
-	return active_oids;
 }
