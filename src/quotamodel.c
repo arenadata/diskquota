@@ -926,9 +926,9 @@ get_tsentry(Oid oid, int16 segid)
 }
 
 void
-update_active_table_size(Oid tableid, int64 size, int16 segid)
+update_active_table_size(Oid oid, int64 size, int16 segid)
 {
-	TableSizeEntry *tsentry = get_tsentry(tableid, segid);
+	TableSizeEntry *tsentry = get_tsentry(oid, segid);
 
 	if (tsentry == NULL)
 	{
@@ -944,7 +944,7 @@ update_active_table_size(Oid tableid, int64 size, int16 segid)
 		Gp_role = GP_ROLE_UTILITY;
 
 		/* when segid is -1, the size is the sum of size of master and all segments */
-		size += calculate_table_size(tableid);
+		size += calculate_table_size(oid);
 
 		Gp_role = GP_ROLE_DISPATCH;
 	}

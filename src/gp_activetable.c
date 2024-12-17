@@ -1054,13 +1054,9 @@ pull_active_table_size_from_seg(const char *active_oids)
 		Oid   oid;
 		int64 size;
 	} * oid_size;
-	HASHCTL ctl = {
-	        .keysize   = sizeof(Oid),
-	        .entrysize = sizeof(*oid_size),
-	        .hcxt      = CurrentMemoryContext,
-	};
-	HTAB *oid_size_map = diskquota_hash_create("local active table map with size info", 1024, &ctl,
-	                                           HASH_ELEM | HASH_CONTEXT, DISKQUOTA_OID_HASH);
+	HASHCTL ctl          = {.keysize = sizeof(Oid), .entrysize = sizeof(*oid_size), .hcxt = CurrentMemoryContext};
+	HTAB   *oid_size_map = diskquota_hash_create("local active table map with size info", 1024, &ctl,
+	                                             HASH_ELEM | HASH_CONTEXT, DISKQUOTA_OID_HASH);
 
 	for (int i = 0; i < cdb_pgresults.numResults; i++)
 	{
