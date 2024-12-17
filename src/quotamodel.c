@@ -220,7 +220,7 @@ static void transfer_table_for_quota(int64 totalsize, QuotaType type, Oid *old_k
 
 /* functions to refresh disk quota model*/
 static void refresh_disk_quota_usage(bool is_init);
-static void calculate_table_disk_usage(HTAB *local_table_stats_map);
+static void calculate_table_disk_usage(bool is_init);
 static void flush_to_table_size(void);
 static bool flush_local_reject_map(void);
 static void dispatch_rejectmap(const char *active_oids);
@@ -809,9 +809,8 @@ refresh_disk_quota_model(bool is_init)
 static void
 refresh_disk_quota_usage(bool is_init)
 {
-	volatile bool pushed_active_snap     = false;
-	volatile bool ret                    = true;
-	HTAB *volatile local_table_stats_map = NULL;
+	volatile bool  pushed_active_snap = false;
+	volatile bool  ret                = true;
 	StringInfoData active_oids;
 
 	StartTransactionCommand();
@@ -829,24 +828,11 @@ refresh_disk_quota_usage(bool is_init)
 		/*
 		 * initialization stage all the tables are active. later loop, only the
 		 * tables whose disk size changed will be treated as active
-		 *
-		 * local_table_stats_map only contains the active tables which belong
-		 * to the current database.
 		 */
-		if (!is_init)
-		{
-			HASHCTL ctl = {
-			        .keysize   = sizeof(Oid),
-			        .entrysize = sizeof(ActiveTableEntryCombined) + SEGCOUNT * sizeof(Size),
-			        .hcxt      = CurrentMemoryContext,
-			};
-			local_table_stats_map = diskquota_hash_create("local active table map with relfilenode info", 1024, &ctl,
-			                                              HASH_ELEM | HASH_CONTEXT, DISKQUOTA_OID_HASH);
-		}
-		gp_fetch_active_tables(&active_oids, local_table_stats_map);
+		gp_fetch_active_tables(is_init, &active_oids);
 		/* TODO: if we can skip the following steps when there is no active table */
 		/* recalculate the disk usage of table, schema and role */
-		calculate_table_disk_usage(local_table_stats_map);
+		calculate_table_disk_usage(is_init);
 		/* refresh quota_info_map */
 		refresh_quota_info_map();
 		/* flush local table_size_map to user table table_size */
@@ -874,7 +860,6 @@ refresh_disk_quota_usage(bool is_init)
 	}
 	PG_END_TRY();
 	if (active_oids.data) pfree(active_oids.data);
-	if (local_table_stats_map) hash_destroy(local_table_stats_map);
 	if (pushed_active_snap) PopActiveSnapshot();
 	if (ret)
 		CommitTransactionCommand();
@@ -926,7 +911,7 @@ get_tsentry(Oid tableid, int16 segid)
 
 	if (!table_size_map_found && tsentry != NULL)
 	{
-		Assert(TableSizeEntrySegidStart(tsentry) == segid);
+		// Assert(TableSizeEntrySegidStart(tsentry) == segid);
 		memset(tsentry->totalsize, 0, sizeof(tsentry->totalsize));
 		tsentry->owneroid      = InvalidOid;
 		tsentry->namespaceoid  = InvalidOid;
@@ -996,7 +981,7 @@ update_active_table_size(Oid tableid, int64 size, int16 segid, void *arg)
  */
 
 static void
-calculate_table_disk_usage(HTAB *local_table_stats_map)
+calculate_table_disk_usage(bool is_init)
 {
 	TableSizeEntry *tsentry = NULL;
 	Oid             relOid;
@@ -1020,7 +1005,7 @@ calculate_table_disk_usage(HTAB *local_table_stats_map)
 	 * calculate the file size for active table and update namespace_size_map
 	 * and role_size_map
 	 */
-	oidlist = get_rel_oid_list(local_table_stats_map == NULL);
+	oidlist = get_rel_oid_list(is_init);
 
 	oidlist = merge_uncommitted_table_to_oidlist(oidlist);
 
@@ -1055,7 +1040,7 @@ calculate_table_disk_usage(HTAB *local_table_stats_map)
 				elog(WARNING, "cache lookup failed for relation %u", relOid);
 				LWLockRelease(diskquota_locks.relation_cache_lock);
 
-				if (local_table_stats_map != NULL) continue;
+				if (!is_init) continue;
 
 				for (int i = -1; i < SEGCOUNT; i++)
 				{
@@ -1095,20 +1080,8 @@ calculate_table_disk_usage(HTAB *local_table_stats_map)
 				break;
 			}
 
-			if (local_table_stats_map != NULL)
-			{
-				bool                      active_tbl_found;
-				ActiveTableEntryCombined *active_table_entry = (ActiveTableEntryCombined *)hash_search(
-				        local_table_stats_map, &relOid, HASH_FIND, &active_tbl_found);
-				/* skip to recalculate the tables which are not in active list */
-				if (active_tbl_found && active_table_entry != NULL)
-				{
-					update_active_table_size(relOid, active_table_entry->tablesize[cur_segid + 1], cur_segid, tsentry);
-				}
-			}
-
 			/* table size info doesn't need to flush at init quota model stage */
-			if (local_table_stats_map == NULL)
+			if (is_init)
 			{
 				TableSizeEntryResetFlushFlag(tsentry, cur_segid);
 			}

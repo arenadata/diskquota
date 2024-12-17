@@ -89,7 +89,7 @@ static void object_access_hook_QuotaStmt(ObjectAccessType access, Oid classId, O
 static HTAB *get_active_tables_stats(ArrayType *array);
 static HTAB *get_active_tables_oid(void);
 static void  pull_active_table_oid_from_seg(StringInfoData *active_oids);
-static void  pull_active_table_size_from_seg(HTAB *local_table_stats_map, const char *active_oids);
+static void  pull_active_table_size_from_seg(const char *active_oids);
 static void  convert_map_to_string(HTAB *oid_map, StringInfoData *active_oids);
 static void  load_table_size(StringInfoData *active_oids);
 static void  report_active_table_helper(const RelFileNodeBackend *relFileNode);
@@ -364,11 +364,11 @@ remove_from_active_table_map(const RelFileNodeBackend *relFileNode)
  * to get the real table size at cluster level.
  */
 void
-gp_fetch_active_tables(StringInfoData *active_oids, HTAB *local_table_stats_map)
+gp_fetch_active_tables(bool is_init, StringInfoData *active_oids)
 {
 	Assert(Gp_role == GP_ROLE_DISPATCH);
 
-	if (local_table_stats_map == NULL)
+	if (is_init)
 	{
 		load_table_size(active_oids);
 	}
@@ -381,7 +381,7 @@ gp_fetch_active_tables(StringInfoData *active_oids, HTAB *local_table_stats_map)
 		        (errcode(ERRCODE_INTERNAL_ERROR), errmsg("[diskquota] active_old_list = %s", active_oids->data)));
 
 		/* step 2: fetch active table sizes based on active oids */
-		pull_active_table_size_from_seg(local_table_stats_map, active_oids->data);
+		pull_active_table_size_from_seg(active_oids->data);
 	}
 }
 
@@ -1029,6 +1029,12 @@ pull_active_table_oid_from_seg(StringInfoData *active_oids)
 	hash_destroy(oid_map);
 }
 
+typedef struct OidSize
+{
+	Oid   oid;
+	int64 size;
+} OidSize;
+
 /*
  * Get active table list from all the segments.
  * Since when loading data, there is case where only subset for
@@ -1039,18 +1045,15 @@ pull_active_table_oid_from_seg(StringInfoData *active_oids)
  * table size on all of the segments.
  */
 static void
-pull_active_table_size_from_seg(HTAB *local_table_stats_map, const char *active_oids)
+pull_active_table_size_from_seg(const char *active_oids)
 {
 	CdbPgResults   cdb_pgresults = {NULL, 0};
-	StringInfoData sql_command;
-	int            i;
-	int            j;
+	StringInfoData sql;
 
-	initStringInfo(&sql_command);
-	appendStringInfo(&sql_command, "select * from diskquota.diskquota_fetch_table_stat(1, ARRAY[%s]::oid[])",
-	                 active_oids);
-	CdbDispatchCommand(sql_command.data, DF_NONE, &cdb_pgresults);
-	pfree(sql_command.data);
+	initStringInfo(&sql);
+	appendStringInfo(&sql, "select * from diskquota.diskquota_fetch_table_stat(1, ARRAY[%s]::oid[])", active_oids);
+	CdbDispatchCommand(sql.data, DF_NONE, &cdb_pgresults);
+	pfree(sql.data);
 
 	SEGCOUNT = cdb_pgresults.numResults;
 	if (SEGCOUNT <= 0)
@@ -1058,15 +1061,17 @@ pull_active_table_size_from_seg(HTAB *local_table_stats_map, const char *active_
 		ereport(ERROR, (errmsg("[diskquota] there is no active segment, SEGCOUNT is %d", SEGCOUNT)));
 	}
 
-	/* sum table size from each segment into local_table_stats_map */
-	for (i = 0; i < cdb_pgresults.numResults; i++)
-	{
-		Size                      tableSize;
-		bool                      found;
-		Oid                       reloid;
-		int                       segId;
-		ActiveTableEntryCombined *entry;
+	OidSize *entry;
+	HASHCTL  ctl = {
+	         .keysize   = sizeof(Oid),
+	         .entrysize = sizeof(OidSize),
+	         .hcxt      = CurrentMemoryContext,
+    };
+	HTAB *size_map = diskquota_hash_create("local active table map with relfilenode info", 1024, &ctl,
+	                                       HASH_ELEM | HASH_CONTEXT, DISKQUOTA_OID_HASH);
 
+	for (int i = 0; i < cdb_pgresults.numResults; i++)
+	{
 		PGresult *pgresult = cdb_pgresults.pg_results[i];
 
 		if (PQresultStatus(pgresult) != PGRES_TUPLES_OK)
@@ -1076,23 +1081,30 @@ pull_active_table_size_from_seg(HTAB *local_table_stats_map, const char *active_
 			                       PQresultStatus(pgresult))));
 		}
 
-		for (j = 0; j < PQntuples(pgresult); j++)
+		for (int j = 0; j < PQntuples(pgresult); j++)
 		{
-			reloid    = atooid(PQgetvalue(pgresult, j, 0));
-			tableSize = (Size)atoll(PQgetvalue(pgresult, j, 1));
-			entry     = (ActiveTableEntryCombined *)hash_search(local_table_stats_map, &reloid, HASH_ENTER, &found);
+			bool  found;
+			Oid   tableid = atooid(PQgetvalue(pgresult, j, 0));
+			int64 size    = atoll(PQgetvalue(pgresult, j, 1));
+			int16 segid   = atoi(PQgetvalue(pgresult, j, 2));
 
-			/* for diskquota extension version is 1.0, pgresult doesn't contain segid */
-			if (PQnfields(pgresult) == 3)
-			{
-				/* get the segid, tablesize for each table */
-				segId                       = atoi(PQgetvalue(pgresult, j, 2));
-				entry->tablesize[segId + 1] = tableSize;
-			}
-
-			/* tablesize for index 0 is the sum of tablesize of master and all segments */
-			entry->tablesize[0] = (found ? entry->tablesize[0] : 0) + tableSize;
+			update_active_table_size(tableid, size, segid, NULL);
+			entry = hash_search(size_map, &tableid, HASH_ENTER, &found);
+			/* tablesize for master is the sum of tablesize of master and all segments */
+			entry->size = (found ? entry->size : 0) + size;
 		}
+		// update_active_table_size(tableid0, size0, -1, NULL);
 	}
 	cdbdisp_clearCdbPgResults(&cdb_pgresults);
+
+	HASH_SEQ_STATUS iter;
+
+	hash_seq_init(&iter, size_map);
+
+	while ((entry = hash_seq_search(&iter)) != NULL)
+	{
+		update_active_table_size(entry->oid, entry->size, -1, NULL);
+	}
+
+	hash_destroy(size_map);
 }
