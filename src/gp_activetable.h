@@ -48,7 +48,6 @@ typedef struct ActiveTableEntryCombined
 } ActiveTableEntryCombined;
 
 extern void gp_fetch_active_tables(StringInfoData *active_oids, HTAB *local_table_stats_map);
-
 extern void init_active_table_hook(void);
 extern void init_shm_worker_active_tables(void);
 extern void init_lock_active_tables(void);
