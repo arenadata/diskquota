@@ -898,18 +898,15 @@ merge_uncommitted_table_to_oidlist(List *oidlist)
 }
 
 static TableSizeEntry *
-get_tsentry(Oid tableid, int16 segid)
+get_tsentry(Oid oid, int16 segid)
 {
-	bool              table_size_map_found;
-	TableSizeEntryKey key = {
-	        .reloid = tableid,
-	        .id     = TableSizeEntryId(segid),
-	};
-	HASHACTION      action  = check_hash_fullness(table_size_map, MAX_NUM_TABLE_SIZE_ENTRIES, table_size_map_warning,
-	                                              table_size_map_last_overflow_report);
-	TableSizeEntry *tsentry = hash_search(table_size_map, &key, action, &table_size_map_found);
+	bool              found;
+	TableSizeEntryKey key     = {.reloid = oid, .id = TableSizeEntryId(segid)};
+	HASHACTION        action  = check_hash_fullness(table_size_map, MAX_NUM_TABLE_SIZE_ENTRIES, table_size_map_warning,
+	                                                table_size_map_last_overflow_report);
+	TableSizeEntry   *tsentry = hash_search(table_size_map, &key, action, &found);
 
-	if (!table_size_map_found && tsentry != NULL)
+	if (!found && tsentry != NULL)
 	{
 		memset(tsentry->totalsize, 0, sizeof(tsentry->totalsize));
 		tsentry->owneroid      = InvalidOid;
