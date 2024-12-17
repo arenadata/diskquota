@@ -1013,7 +1013,7 @@ pull_active_table_oid_from_seg(StringInfoData *active_oids)
 		/* push the active table oid into oid_map */
 		for (int row = 0; row < PQntuples(pgresult); row++)
 		{
-			Oid oid = atooid(PQgetvalue(pgresult, row, PQfnumber(pgresult, "TABLE_OID")));
+			Oid oid = atooid(PQgetvalue(pgresult, row, PQfnumber(pgresult, "\"TABLE_OID\"")));
 			(void)hash_search(oid_map, &oid, HASH_ENTER, NULL);
 		}
 	}
@@ -1072,8 +1072,8 @@ pull_active_table_size_from_seg(const char *active_oids)
 		for (int row = 0; row < PQntuples(pgresult); row++)
 		{
 			bool  found;
-			Oid   oid  = atooid(PQgetvalue(pgresult, row, PQfnumber(pgresult, "TABLE_OID")));
-			int64 size = atoll(PQgetvalue(pgresult, row, PQfnumber(pgresult, "TABLE_SIZE")));
+			Oid   oid  = atooid(PQgetvalue(pgresult, row, PQfnumber(pgresult, "\"TABLE_OID\"")));
+			int64 size = atoll(PQgetvalue(pgresult, row, PQfnumber(pgresult, "\"TABLE_SIZE\"")));
 
 			update_active_table_size(oid, size, segid);
 			oid_size = hash_search(map, &oid, HASH_ENTER, &found);
