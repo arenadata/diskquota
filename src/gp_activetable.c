@@ -995,7 +995,7 @@ pull_active_table_oid_from_seg(StringInfoData *active_oids)
 	                                                   HASH_ELEM | HASH_CONTEXT, DISKQUOTA_OID_HASH);
 
 	/* first get all oid of tables which are active table on any segment */
-	static const char *sql = "select * from diskquota.diskquota_fetch_table_stat(0, '{}'::oid[])";
+	static const char *sql = "select * from diskquota.diskquota_fetch_table_stat(0, ARRAY[]::oid[])";
 
 	/* any errors will be catch in upper level */
 	CdbDispatchCommand(sql, DF_NONE, &cdb_pgresults);
@@ -1013,8 +1013,8 @@ pull_active_table_oid_from_seg(StringInfoData *active_oids)
 		/* push the active table oid into oid_map */
 		for (int row = 0; row < PQntuples(pgresult); row++)
 		{
-			Oid reloid = atooid(PQgetvalue(pgresult, row, 0));
-			(void)hash_search(oid_map, &reloid, HASH_ENTER, NULL);
+			Oid oid = atooid(PQgetvalue(pgresult, row, PQfnumber(pgresult, "TABLE_OID")));
+			(void)hash_search(oid_map, &oid, HASH_ENTER, NULL);
 		}
 	}
 	cdbdisp_clearCdbPgResults(&cdb_pgresults);
@@ -1072,8 +1072,8 @@ pull_active_table_size_from_seg(const char *active_oids)
 		for (int row = 0; row < PQntuples(pgresult); row++)
 		{
 			bool  found;
-			Oid   oid  = atooid(PQgetvalue(pgresult, row, 0));
-			int64 size = atoll(PQgetvalue(pgresult, row, 1));
+			Oid   oid  = atooid(PQgetvalue(pgresult, row, PQfnumber(pgresult, "TABLE_OID")));
+			int64 size = atoll(PQgetvalue(pgresult, row, PQfnumber(pgresult, "TABLE_SIZE")));
 
 			update_active_table_size(oid, size, segid);
 			oid_size = hash_search(map, &oid, HASH_ENTER, &found);
