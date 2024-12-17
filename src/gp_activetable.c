@@ -91,6 +91,7 @@ static HTAB *get_active_tables_oid(void);
 
 static StringInfoData pull_active_list_from_seg(void);
 static StringInfoData pull_active_table_size_from_seg(HTAB *local_table_stats_map);
+static StringInfoData convert_map_to_string(HTAB *active_list);
 static StringInfoData load_table_size(void);
 
 static void report_active_table_helper(const RelFileNodeBackend *relFileNode);
