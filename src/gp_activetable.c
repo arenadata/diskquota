@@ -1069,12 +1069,12 @@ pull_active_table_size_from_seg(const char *active_oids)
 			                       PQresultStatus(pgresult))));
 		}
 
-		for (int j = 0; j < PQntuples(pgresult); j++)
+		for (int row = 0; row < PQntuples(pgresult); row++)
 		{
 			bool  found;
-			Oid   oid   = atooid(PQgetvalue(pgresult, j, 0));
-			int64 size  = atoll(PQgetvalue(pgresult, j, 1));
-			int16 segid = atoi(PQgetvalue(pgresult, j, 2));
+			Oid   oid   = atooid(PQgetvalue(pgresult, row, 0));
+			int64 size  = atoll(PQgetvalue(pgresult, row, 1));
+			int16 segid = atoi(PQgetvalue(pgresult, row, 2));
 
 			update_active_table_size(oid, size, segid);
 			oid_size = hash_search(oid_size_map, &oid, HASH_ENTER, &found);
