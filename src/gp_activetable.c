@@ -999,9 +999,9 @@ pull_active_table_oid_from_seg(StringInfoData *active_oids)
 
 	/* any errors will be catch in upper level */
 	CdbDispatchCommand(sql, DF_NONE, &cdb_pgresults);
-	for (int i = 0; i < cdb_pgresults.numResults; i++)
+	for (int16 segid = 0; segid < cdb_pgresults.numResults; segid++)
 	{
-		PGresult *pgresult = cdb_pgresults.pg_results[i];
+		PGresult *pgresult = cdb_pgresults.pg_results[segid];
 
 		if (PQresultStatus(pgresult) != PGRES_TUPLES_OK)
 		{
@@ -1011,9 +1011,9 @@ pull_active_table_oid_from_seg(StringInfoData *active_oids)
 		}
 
 		/* push the active table oid into oid_map */
-		for (int j = 0; j < PQntuples(pgresult); j++)
+		for (int row = 0; row < PQntuples(pgresult); row++)
 		{
-			Oid reloid = atooid(PQgetvalue(pgresult, j, 0));
+			Oid reloid = atooid(PQgetvalue(pgresult, row, 0));
 			(void)hash_search(oid_map, &reloid, HASH_ENTER, NULL);
 		}
 	}
