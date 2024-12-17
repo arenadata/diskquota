@@ -1055,7 +1055,9 @@ pull_active_list_from_seg(void)
 	}
 	cdbdisp_clearCdbPgResults(&cdb_pgresults);
 
+	MemoryContext  oldContext  = MemoryContextSwitchTo(CurTransactionContext);
 	StringInfoData active_oids = convert_map_to_string(local_active_table_oid_map);
+	MemoryContextSwitchTo(oldContext);
 	hash_destroy(local_active_table_oid_map);
 
 	return active_oids;
