@@ -35,6 +35,7 @@
 #include "storage/smgr.h"
 #include "utils/faultinjector.h"
 #include "utils/lsyscache.h"
+#include "utils/memutils.h"
 #include "utils/syscache.h"
 #include "utils/inval.h"
 
@@ -948,7 +949,7 @@ load_table_size(void)
 			        DatumGetArrayTypePwrapper(SPI_getbinval_wrapper(val, tupdesc, "size", false, INT8ARRAYOID));
 			Datum *sizes;
 			int    nelems;
-			active_oids = accumArrayResult(active_oids, ObjectIdGetDatum(tableid), false, OIDOID, TopMemoryContext);
+			active_oids = accumArrayResult(active_oids, ObjectIdGetDatum(tableid), false, OIDOID, CurTransactionContext);
 			deconstruct_array(array, ARR_ELEMTYPE(array), typlen, typbyval, typalign, &sizes, NULL, &nelems);
 			Assert(nelems == SEGCOUNT + 1);
 			for (int16 segid = -1; segid < SEGCOUNT; segid++)
@@ -998,7 +999,7 @@ pull_active_list_from_seg(void)
 			TupleDesc tupdesc = SPI_tuptable->tupdesc;
 			Oid       tableid = DatumGetObjectId(SPI_getbinval_wrapper(val, tupdesc, "TABLE_OID", false, OIDOID));
 			/* push the active table oid into active_oids array */
-			active_oids = accumArrayResult(active_oids, ObjectIdGetDatum(tableid), false, OIDOID, TopMemoryContext);
+			active_oids = accumArrayResult(active_oids, ObjectIdGetDatum(tableid), false, OIDOID, CurTransactionContext);
 		}
 		SPI_freetuptable(SPI_tuptable);
 	} while (SPI_processed);
