@@ -911,7 +911,6 @@ get_tsentry(Oid tableid, int16 segid)
 
 	if (!table_size_map_found && tsentry != NULL)
 	{
-		// Assert(TableSizeEntrySegidStart(tsentry) == segid);
 		memset(tsentry->totalsize, 0, sizeof(tsentry->totalsize));
 		tsentry->owneroid      = InvalidOid;
 		tsentry->namespaceoid  = InvalidOid;
@@ -1380,7 +1379,6 @@ dispatch_rejectmap(const char *active_oids)
 	                 "ARRAY[%s]::diskquota.rejectmap_entry[], "
 	                 "ARRAY[%s]::oid[])",
 	                 rows.data, active_oids);
-
 	CdbDispatchCommand(sql.data, DF_NONE, &cdb_pgresults);
 
 	pfree(rows.data);
