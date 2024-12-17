@@ -954,7 +954,7 @@ load_table_size(void)
 			Datum *sizes;
 			int    nelems;
 			if (active_oids.len > 0) appendStringInfoString(&active_oids, ",");
-			appendStringInfo(&active_oids, "%i", tableid);
+			appendStringInfo(&active_oids, "%d", tableid);
 			deconstruct_array(array, ARR_ELEMTYPE(array), typlen, typbyval, typalign, &sizes, NULL, &nelems);
 			Assert(nelems == SEGCOUNT + 1);
 			for (int16 segid = -1; segid < SEGCOUNT; segid++)
