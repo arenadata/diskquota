@@ -1029,12 +1029,6 @@ pull_active_table_oid_from_seg(StringInfoData *active_oids)
 	hash_destroy(oid_map);
 }
 
-typedef struct OidSize
-{
-	Oid   oid;
-	int64 size;
-} OidSize;
-
 /*
  * Get active table list from all the segments.
  * Since when loading data, there is case where only subset for
@@ -1061,14 +1055,18 @@ pull_active_table_size_from_seg(const char *active_oids)
 		ereport(ERROR, (errmsg("[diskquota] there is no active segment, SEGCOUNT is %d", SEGCOUNT)));
 	}
 
-	OidSize *entry;
-	HASHCTL  ctl = {
-	         .keysize   = sizeof(Oid),
-	         .entrysize = sizeof(OidSize),
-	         .hcxt      = CurrentMemoryContext,
-    };
-	HTAB *size_map = diskquota_hash_create("local active table map with relfilenode info", 1024, &ctl,
-	                                       HASH_ELEM | HASH_CONTEXT, DISKQUOTA_OID_HASH);
+	struct
+	{
+		Oid   oid;
+		int64 size;
+	} * oid_size;
+	HASHCTL ctl = {
+	        .keysize   = sizeof(Oid),
+	        .entrysize = sizeof(*oid_size),
+	        .hcxt      = CurrentMemoryContext,
+	};
+	HTAB *oid_size_map = diskquota_hash_create("local active table map with size info", 1024, &ctl,
+	                                           HASH_ELEM | HASH_CONTEXT, DISKQUOTA_OID_HASH);
 
 	for (int i = 0; i < cdb_pgresults.numResults; i++)
 	{
@@ -1084,14 +1082,14 @@ pull_active_table_size_from_seg(const char *active_oids)
 		for (int j = 0; j < PQntuples(pgresult); j++)
 		{
 			bool  found;
-			Oid   tableid = atooid(PQgetvalue(pgresult, j, 0));
-			int64 size    = atoll(PQgetvalue(pgresult, j, 1));
-			int16 segid   = atoi(PQgetvalue(pgresult, j, 2));
+			Oid   oid   = atooid(PQgetvalue(pgresult, j, 0));
+			int64 size  = atoll(PQgetvalue(pgresult, j, 1));
+			int16 segid = atoi(PQgetvalue(pgresult, j, 2));
 
-			update_active_table_size(tableid, size, segid, NULL);
-			entry = hash_search(size_map, &tableid, HASH_ENTER, &found);
+			update_active_table_size(oid, size, segid, NULL);
+			oid_size = hash_search(oid_size_map, &oid, HASH_ENTER, &found);
 			/* tablesize for master is the sum of tablesize of master and all segments */
-			entry->size = (found ? entry->size : 0) + size;
+			oid_size->size = (found ? oid_size->size : 0) + size;
 		}
 		// update_active_table_size(tableid0, size0, -1, NULL);
 	}
@@ -1099,12 +1097,12 @@ pull_active_table_size_from_seg(const char *active_oids)
 
 	HASH_SEQ_STATUS iter;
 
-	hash_seq_init(&iter, size_map);
+	hash_seq_init(&iter, oid_size_map);
 
-	while ((entry = hash_seq_search(&iter)) != NULL)
+	while ((oid_size = hash_seq_search(&iter)) != NULL)
 	{
-		update_active_table_size(entry->oid, entry->size, -1, NULL);
+		update_active_table_size(oid_size->oid, oid_size->size, -1, NULL);
 	}
 
-	hash_destroy(size_map);
+	hash_destroy(oid_size_map);
 }
