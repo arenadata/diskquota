@@ -90,7 +90,7 @@ static HTAB *get_active_tables_stats(ArrayType *array);
 static HTAB *get_active_tables_oid(void);
 static void  pull_active_table_oid_from_seg(StringInfoData *active_oids);
 static void  pull_active_table_size_from_seg(const char *active_oids);
-static void  convert_map_to_string(HTAB *oid_map, StringInfoData *active_oids);
+static void  convert_map_to_string(HTAB *map, StringInfoData *buf);
 static void  load_table_size(StringInfoData *active_oids);
 static void  report_active_table_helper(const RelFileNodeBackend *relFileNode);
 static void  remove_from_active_table_map(const RelFileNodeBackend *relFileNode);
@@ -966,17 +966,17 @@ load_table_size(StringInfoData *active_oids)
  * of function diskquota_fetch_table_stat.
  */
 static void
-convert_map_to_string(HTAB *oid_map, StringInfoData *active_oids)
+convert_map_to_string(HTAB *map, StringInfoData *buf)
 {
 	HASH_SEQ_STATUS iter;
 	Oid            *oid;
 
-	hash_seq_init(&iter, oid_map);
+	hash_seq_init(&iter, map);
 
 	while ((oid = hash_seq_search(&iter)) != NULL)
 	{
-		if (active_oids->len > 0) appendStringInfoString(active_oids, ",");
-		appendStringInfo(active_oids, "%d", *oid);
+		if (buf->len > 0) appendStringInfoString(buf, ",");
+		appendStringInfo(buf, "%d", *oid);
 	}
 }
 
@@ -990,9 +990,10 @@ static void
 pull_active_table_oid_from_seg(StringInfoData *active_oids)
 {
 	CdbPgResults cdb_pgresults = {NULL, 0};
-	HASHCTL      ctl           = {.keysize = sizeof(Oid), .entrysize = sizeof(Oid), .hcxt = CurrentMemoryContext};
-	HTAB        *oid_map       = diskquota_hash_create("local active table map with relfilenode info", 1024, &ctl,
-	                                                   HASH_ELEM | HASH_CONTEXT, DISKQUOTA_OID_HASH);
+
+	HASHCTL ctl = {.keysize = sizeof(Oid), .entrysize = sizeof(Oid), .hcxt = CurrentMemoryContext};
+	HTAB   *map = diskquota_hash_create("local active table map with relfilenode info", 1024, &ctl,
+	                                    HASH_ELEM | HASH_CONTEXT, DISKQUOTA_OID_HASH);
 
 	/* first get all oid of tables which are active table on any segment */
 	static const char *sql = "select * from diskquota.diskquota_fetch_table_stat(0, ARRAY[]::oid[])";
@@ -1014,13 +1015,13 @@ pull_active_table_oid_from_seg(StringInfoData *active_oids)
 		for (int row = 0; row < PQntuples(pgresult); row++)
 		{
 			Oid oid = atooid(PQgetvalue(pgresult, row, PQfnumber(pgresult, "\"TABLE_OID\"")));
-			(void)hash_search(oid_map, &oid, HASH_ENTER, NULL);
+			(void)hash_search(map, &oid, HASH_ENTER, NULL);
 		}
 	}
 	cdbdisp_clearCdbPgResults(&cdb_pgresults);
 
-	convert_map_to_string(oid_map, active_oids);
-	hash_destroy(oid_map);
+	convert_map_to_string(map, active_oids);
+	hash_destroy(map);
 }
 
 /*
