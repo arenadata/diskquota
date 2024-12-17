@@ -90,7 +90,7 @@ static HTAB *get_active_tables_stats(ArrayType *array);
 static HTAB *get_active_tables_oid(void);
 static HTAB *pull_active_list_from_seg(void);
 static void  pull_active_table_size_from_seg(HTAB *local_table_stats_map, const char *active_oids);
-static void  convert_map_to_string(HTAB *local_table_oid_map, StringInfoData *active_oids);
+static void  convert_map_to_string(HTAB *oid_map, StringInfoData *active_oids);
 static void  load_table_size(StringInfoData *active_oids);
 static void  report_active_table_helper(const RelFileNodeBackend *relFileNode);
 static void  remove_from_active_table_map(const RelFileNodeBackend *relFileNode);
@@ -375,10 +375,10 @@ gp_fetch_active_tables(StringInfoData *active_oids, HTAB *local_table_stats_map)
 	else
 	{
 		/* step 1: fetch active oids from all the segments */
-		HTAB *local_table_oid_map = pull_active_list_from_seg();
+		HTAB *oid_map = pull_active_list_from_seg();
 
-		convert_map_to_string(local_table_oid_map, active_oids);
-		hash_destroy(local_table_oid_map);
+		convert_map_to_string(oid_map, active_oids);
+		hash_destroy(oid_map);
 
 		ereport(DEBUG1,
 		        (errcode(ERRCODE_INTERNAL_ERROR), errmsg("[diskquota] active_old_list = %s", active_oids->data)));
@@ -975,17 +975,17 @@ load_table_size(StringInfoData *active_oids)
  * of function diskquota_fetch_table_stat.
  */
 static void
-convert_map_to_string(HTAB *local_table_oid_map, StringInfoData *active_oids)
+convert_map_to_string(HTAB *oid_map, StringInfoData *active_oids)
 {
-	HASH_SEQ_STATUS            iter;
-	DiskQuotaActiveTableEntry *entry;
+	HASH_SEQ_STATUS iter;
+	Oid            *oid;
 
-	hash_seq_init(&iter, local_table_oid_map);
+	hash_seq_init(&iter, oid_map);
 
-	while ((entry = (DiskQuotaActiveTableEntry *)hash_seq_search(&iter)) != NULL)
+	while ((oid = hash_seq_search(&iter)) != NULL)
 	{
 		if (active_oids->len > 0) appendStringInfoString(active_oids, ",");
-		appendStringInfo(active_oids, "%d", entry->reloid);
+		appendStringInfo(active_oids, "%d", *oid);
 	}
 }
 
@@ -998,30 +998,18 @@ convert_map_to_string(HTAB *local_table_oid_map, StringInfoData *active_oids)
 static HTAB *
 pull_active_list_from_seg(void)
 {
-	CdbPgResults               cdb_pgresults = {NULL, 0};
-	int                        i, j;
-	char                      *sql                        = NULL;
-	HTAB                      *local_active_table_oid_map = NULL;
-	HASHCTL                    ctl;
-	DiskQuotaActiveTableEntry *entry;
-
-	memset(&ctl, 0, sizeof(ctl));
-	ctl.keysize                = sizeof(Oid);
-	ctl.entrysize              = sizeof(DiskQuotaActiveTableEntry);
-	ctl.hcxt                   = CurrentMemoryContext;
-	local_active_table_oid_map = diskquota_hash_create("local active table map with relfilenode info", 1024, &ctl,
+	CdbPgResults cdb_pgresults = {NULL, 0};
+	HASHCTL      ctl           = {.keysize = sizeof(Oid), .entrysize = sizeof(Oid), .hcxt = CurrentMemoryContext};
+	HTAB        *oid_map       = diskquota_hash_create("local active table map with relfilenode info", 1024, &ctl,
 	                                                   HASH_ELEM | HASH_CONTEXT, DISKQUOTA_OID_HASH);
 
 	/* first get all oid of tables which are active table on any segment */
-	sql = "select * from diskquota.diskquota_fetch_table_stat(0, '{}'::oid[])";
+	static const char *sql = "select * from diskquota.diskquota_fetch_table_stat(0, '{}'::oid[])";
 
 	/* any errors will be catch in upper level */
 	CdbDispatchCommand(sql, DF_NONE, &cdb_pgresults);
-	for (i = 0; i < cdb_pgresults.numResults; i++)
+	for (int i = 0; i < cdb_pgresults.numResults; i++)
 	{
-		Oid  reloid;
-		bool found;
-
 		PGresult *pgresult = cdb_pgresults.pg_results[i];
 
 		if (PQresultStatus(pgresult) != PGRES_TUPLES_OK)
@@ -1031,24 +1019,16 @@ pull_active_list_from_seg(void)
 			                       PQresultStatus(pgresult))));
 		}
 
-		/* push the active table oid into local_active_table_oid_map */
-		for (j = 0; j < PQntuples(pgresult); j++)
+		/* push the active table oid into oid_map */
+		for (int j = 0; j < PQntuples(pgresult); j++)
 		{
-			reloid = atooid(PQgetvalue(pgresult, j, 0));
-
-			entry = (DiskQuotaActiveTableEntry *)hash_search(local_active_table_oid_map, &reloid, HASH_ENTER, &found);
-
-			if (!found)
-			{
-				entry->reloid    = reloid;
-				entry->tablesize = 0;
-				entry->segid     = -1;
-			}
+			Oid reloid = atooid(PQgetvalue(pgresult, j, 0));
+			(void)hash_search(oid_map, &reloid, HASH_ENTER, NULL);
 		}
 	}
 	cdbdisp_clearCdbPgResults(&cdb_pgresults);
 
-	return local_active_table_oid_map;
+	return oid_map;
 }
 
 /*
