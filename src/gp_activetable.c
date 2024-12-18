@@ -1002,7 +1002,7 @@ pull_active_list_from_seg(StringInfoData *active_oids)
 	CdbDispatchCommand(sql, DF_NONE, &cdb_pgresults);
 	Assert(SEGCOUNT == cdb_pgresults.numResults);
 
-	for (int16 segid = 0; segid < cdb_pgresults.numResults; segid++)
+	for (int16 segid = 0; segid < SEGCOUNT; segid++)
 	{
 		PGresult *pgresult = cdb_pgresults.pg_results[segid];
 
@@ -1055,7 +1055,7 @@ pull_active_table_size_from_seg(const char *active_oids)
 	pfree(sql.data);
 	Assert(SEGCOUNT == cdb_pgresults.numResults);
 
-	for (int16 segid = 0; segid < cdb_pgresults.numResults; segid++)
+	for (int16 segid = 0; segid < SEGCOUNT; segid++)
 	{
 		PGresult *pgresult = cdb_pgresults.pg_results[segid];
 
