@@ -1000,6 +1000,8 @@ pull_active_table_oid_from_seg(StringInfoData *active_oids)
 
 	/* any errors will be catch in upper level */
 	CdbDispatchCommand(sql, DF_NONE, &cdb_pgresults);
+	Assert(SEGCOUNT == cdb_pgresults.numResults);
+
 	for (int16 segid = 0; segid < cdb_pgresults.numResults; segid++)
 	{
 		PGresult *pgresult = cdb_pgresults.pg_results[segid];
@@ -1036,30 +1038,24 @@ pull_active_table_oid_from_seg(StringInfoData *active_oids)
 static void
 pull_active_table_size_from_seg(const char *active_oids)
 {
-	CdbPgResults   cdb_pgresults = {NULL, 0};
-	StringInfoData sql;
-
-	initStringInfo(&sql);
-	appendStringInfo(&sql, "select * from diskquota.diskquota_fetch_table_stat(1, ARRAY[%s]::oid[])", active_oids);
-	CdbDispatchCommand(sql.data, DF_NONE, &cdb_pgresults);
-	pfree(sql.data);
-
-	SEGCOUNT = cdb_pgresults.numResults;
-	if (SEGCOUNT <= 0)
-	{
-		ereport(ERROR, (errmsg("[diskquota] there is no active segment, SEGCOUNT is %d", SEGCOUNT)));
-	}
-
 	struct
 	{
 		Oid   oid;
 		int64 size;
 	} * oid_size;
-	HASHCTL ctl = {.keysize = sizeof(Oid), .entrysize = sizeof(*oid_size), .hcxt = CurrentMemoryContext};
-	HTAB   *map = diskquota_hash_create("local active table map with size info", 1024, &ctl, HASH_ELEM | HASH_CONTEXT,
-	                                    DISKQUOTA_OID_HASH);
+	CdbPgResults   cdb_pgresults = {NULL, 0};
+	StringInfoData sql;
+	HASHCTL        ctl = {.keysize = sizeof(Oid), .entrysize = sizeof(*oid_size), .hcxt = CurrentMemoryContext};
+	HTAB *map = diskquota_hash_create("local active table map with size info", 1024, &ctl, HASH_ELEM | HASH_CONTEXT,
+	                                  DISKQUOTA_OID_HASH);
 
-	for (int segid = 0; segid < cdb_pgresults.numResults; segid++)
+	initStringInfo(&sql);
+	appendStringInfo(&sql, "select * from diskquota.diskquota_fetch_table_stat(1, ARRAY[%s]::oid[])", active_oids);
+	CdbDispatchCommand(sql.data, DF_NONE, &cdb_pgresults);
+	pfree(sql.data);
+	Assert(SEGCOUNT == cdb_pgresults.numResults);
+
+	for (int16 segid = 0; segid < cdb_pgresults.numResults; segid++)
 	{
 		PGresult *pgresult = cdb_pgresults.pg_results[segid];
 
@@ -1075,6 +1071,7 @@ pull_active_table_size_from_seg(const char *active_oids)
 			bool  found;
 			Oid   oid  = atooid(PQgetvalue(pgresult, row, PQfnumber(pgresult, "\"TABLE_OID\"")));
 			int64 size = atoll(PQgetvalue(pgresult, row, PQfnumber(pgresult, "\"TABLE_SIZE\"")));
+			Assert(segid == atoll(PQgetvalue(pgresult, row, PQfnumber(pgresult, "\"GP_SEGMENT_ID\""))));
 
 			update_active_table_size(oid, size, segid);
 			oid_size = hash_search(map, &oid, HASH_ENTER, &found);
