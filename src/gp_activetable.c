@@ -1071,7 +1071,7 @@ pull_active_table_size_from_seg(const char *active_oids)
 			bool  found;
 			Oid   oid  = atooid(PQgetvalue(pgresult, row, PQfnumber(pgresult, "\"TABLE_OID\"")));
 			int64 size = atoll(PQgetvalue(pgresult, row, PQfnumber(pgresult, "\"TABLE_SIZE\"")));
-			Assert(segid == atoll(PQgetvalue(pgresult, row, PQfnumber(pgresult, "\"GP_SEGMENT_ID\""))));
+			Assert(segid == atoi(PQgetvalue(pgresult, row, PQfnumber(pgresult, "\"GP_SEGMENT_ID\""))));
 
 			update_active_table_size(oid, size, segid);
 			oid_size = hash_search(map, &oid, HASH_ENTER, &found);
