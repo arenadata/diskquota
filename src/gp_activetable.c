@@ -957,15 +957,20 @@ load_table_size(StringInfoData *active_oids)
 	if ((portal = SPI_cursor_open(NULL, plan, NULL, NULL, true)) == NULL)
 		ereport(ERROR, (errmsg("[diskquota] SPI_cursor_open(\"%s\") failed", sql)));
 
-	do
+	SPI_cursor_fetch(portal, true, 10000);
+
+	if (SPI_tuptable == NULL)
 	{
-		SPI_cursor_fetch(portal, true, 10000);
+		ereport(ERROR, (errmsg("[diskquota] load_table_size SPI_cursor_fetch failed")));
+	}
 
-		TupleDesc tupdesc     = SPI_tuptable->tupdesc;
-		int       tableid_num = SPI_fnumber_wrapper(tupdesc, "tableid", OIDOID);
-		int       size_num    = SPI_fnumber_wrapper(tupdesc, "size", INT8OID);
-		int       segid_num   = SPI_fnumber_wrapper(tupdesc, "segid", INT2OID);
+	TupleDesc tupdesc     = SPI_tuptable->tupdesc;
+	int       tableid_num = SPI_fnumber_wrapper(tupdesc, "tableid", OIDOID);
+	int       size_num    = SPI_fnumber_wrapper(tupdesc, "size", INT8OID);
+	int       segid_num   = SPI_fnumber_wrapper(tupdesc, "segid", INT2OID);
 
+	while (SPI_processed > 0)
+	{
 		for (uint64 row = 0; row < SPI_processed; row++)
 		{
 			HeapTuple val   = SPI_tuptable->vals[row];
@@ -982,8 +987,10 @@ load_table_size(StringInfoData *active_oids)
 			}
 		}
 		SPI_freetuptable(SPI_tuptable);
-	} while (SPI_processed);
+		SPI_cursor_fetch(portal, true, 10000);
+	}
 
+	SPI_freetuptable(SPI_tuptable);
 	SPI_cursor_close(portal);
 	SPI_freeplan(plan);
 	SPI_finish_if(connected_in_this_function);
