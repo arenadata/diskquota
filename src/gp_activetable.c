@@ -970,8 +970,8 @@ load_table_size(StringInfoData *active_oids)
 		{
 			HeapTuple val   = SPI_tuptable->vals[row];
 			Oid       oid   = DatumGetObjectId(SPI_getbinval_wrapper(val, tupdesc, tableid_num, false));
-			int64     size  = DatumGetObjectId(SPI_getbinval_wrapper(val, tupdesc, size_num, false));
-			int16     segid = DatumGetObjectId(SPI_getbinval_wrapper(val, tupdesc, segid_num, false));
+			int64     size  = DatumGetInt64(SPI_getbinval_wrapper(val, tupdesc, size_num, false));
+			int16     segid = DatumGetInt16(SPI_getbinval_wrapper(val, tupdesc, segid_num, false));
 
 			update_active_table_size(oid, size, segid);
 
