@@ -1004,7 +1004,8 @@ pull_active_list_from_seg(StringInfoData *active_oids)
 
 	for (int16 segid = 0; segid < SEGCOUNT; segid++)
 	{
-		PGresult *pgresult = cdb_pgresults.pg_results[segid];
+		PGresult *pgresult  = cdb_pgresults.pg_results[segid];
+		int       TABLE_OID = PQfnumber(pgresult, "\"TABLE_OID\"");
 
 		if (PQresultStatus(pgresult) != PGRES_TUPLES_OK)
 		{
@@ -1016,7 +1017,7 @@ pull_active_list_from_seg(StringInfoData *active_oids)
 		/* push the active table oid into oid_map */
 		for (int row = 0; row < PQntuples(pgresult); row++)
 		{
-			Oid oid = atooid(PQgetvalue(pgresult, row, PQfnumber(pgresult, "\"TABLE_OID\"")));
+			Oid oid = atooid(PQgetvalue(pgresult, row, TABLE_OID));
 			(void)hash_search(map, &oid, HASH_ENTER, NULL);
 		}
 	}
@@ -1057,7 +1058,12 @@ pull_active_table_size_from_seg(const char *active_oids)
 
 	for (int16 segid = 0; segid < SEGCOUNT; segid++)
 	{
-		PGresult *pgresult = cdb_pgresults.pg_results[segid];
+		PGresult *pgresult   = cdb_pgresults.pg_results[segid];
+		int       TABLE_OID  = PQfnumber(pgresult, "\"TABLE_OID\"");
+		int       TABLE_SIZE = PQfnumber(pgresult, "\"TABLE_SIZE\"");
+#ifdef USE_ASSERT_CHECKING
+		int GP_SEGMENT_ID = PQfnumber(pgresult, "\"GP_SEGMENT_ID\"");
+#endif
 
 		if (PQresultStatus(pgresult) != PGRES_TUPLES_OK)
 		{
@@ -1069,9 +1075,9 @@ pull_active_table_size_from_seg(const char *active_oids)
 		for (int row = 0; row < PQntuples(pgresult); row++)
 		{
 			bool  found;
-			Oid   oid  = atooid(PQgetvalue(pgresult, row, PQfnumber(pgresult, "\"TABLE_OID\"")));
-			int64 size = atoll(PQgetvalue(pgresult, row, PQfnumber(pgresult, "\"TABLE_SIZE\"")));
-			Assert(segid == atoi(PQgetvalue(pgresult, row, PQfnumber(pgresult, "\"GP_SEGMENT_ID\""))));
+			Oid   oid  = atooid(PQgetvalue(pgresult, row, TABLE_OID));
+			int64 size = atoll(PQgetvalue(pgresult, row, TABLE_SIZE));
+			Assert(segid == atoi(PQgetvalue(pgresult, row, GP_SEGMENT_ID)));
 
 			update_active_table_size(oid, size, segid);
 			oid_size = hash_search(map, &oid, HASH_ENTER, &found);
