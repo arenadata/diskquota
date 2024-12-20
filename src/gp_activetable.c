@@ -35,7 +35,6 @@
 #include "storage/smgr.h"
 #include "utils/faultinjector.h"
 #include "utils/lsyscache.h"
-#include "utils/memutils.h"
 #include "utils/syscache.h"
 #include "utils/inval.h"
 
