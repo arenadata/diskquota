@@ -913,6 +913,30 @@ get_active_tables_oid(void)
 	return local_active_table_stats_map;
 }
 
+static int
+SPI_fnumber_wrapper(TupleDesc tupdesc, const char *fname, Oid typeid)
+{
+	int fnumber = SPI_fnumber(tupdesc, fname);
+
+	if (SPI_gettypeid(tupdesc, fnumber) != typeid)
+		ereport(ERROR, (errcode(ERRCODE_MOST_SPECIFIC_TYPE_MISMATCH),
+		                errmsg("type of column \"%s\" must be \"%d\"", fname, typeid)));
+
+	return fnumber;
+}
+
+static Datum
+SPI_getbinval_wrapper(HeapTuple tuple, TupleDesc tupdesc, int fnumber, bool allow_null)
+{
+	bool  isnull;
+	Datum datum = SPI_getbinval(tuple, tupdesc, fnumber, &isnull);
+
+	if (isnull && !allow_null)
+		ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("column %d must not be null", fnumber)));
+
+	return datum;
+}
+
 /*
  * Load table size info from diskquota.table_size table.
  * This is called when system startup, disk quota rejectmap
@@ -936,13 +960,18 @@ load_table_size(StringInfoData *active_oids)
 	do
 	{
 		SPI_cursor_fetch(portal, true, 10000);
+
+		TupleDesc tupdesc     = SPI_tuptable->tupdesc;
+		int       tableid_num = SPI_fnumber_wrapper(tupdesc, "tableid", OIDOID);
+		int       size_num    = SPI_fnumber_wrapper(tupdesc, "size", INT8OID);
+		int       segid_num   = SPI_fnumber_wrapper(tupdesc, "segid", INT2OID);
+
 		for (uint64 row = 0; row < SPI_processed; row++)
 		{
-			HeapTuple val     = SPI_tuptable->vals[row];
-			TupleDesc tupdesc = SPI_tuptable->tupdesc;
-			Oid       oid     = DatumGetObjectId(SPI_getbinval_wrapper(val, tupdesc, "tableid", false, OIDOID));
-			int64     size    = DatumGetObjectId(SPI_getbinval_wrapper(val, tupdesc, "size", false, INT8OID));
-			int16     segid   = DatumGetObjectId(SPI_getbinval_wrapper(val, tupdesc, "segid", false, INT2OID));
+			HeapTuple val   = SPI_tuptable->vals[row];
+			Oid       oid   = DatumGetObjectId(SPI_getbinval_wrapper(val, tupdesc, tableid_num, false));
+			int64     size  = DatumGetObjectId(SPI_getbinval_wrapper(val, tupdesc, size_num, false));
+			int16     segid = DatumGetObjectId(SPI_getbinval_wrapper(val, tupdesc, segid_num, false));
 
 			update_active_table_size(oid, size, segid);
 

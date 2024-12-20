@@ -1714,18 +1714,3 @@ SPI_finish_if(bool connected_in_calling_function)
 	          (errcode(ERRCODE_INTERNAL_ERROR), errmsg("[diskquota] SPI_finish failed"),
 	           errdetail("%s", SPI_result_code_string(rc))));
 }
-
-Datum
-SPI_getbinval_wrapper(HeapTuple tuple, TupleDesc tupdesc, const char *fname, bool allow_null, Oid typeid)
-{
-	bool  isnull;
-	Datum datum;
-	int   fnumber = SPI_fnumber(tupdesc, fname);
-	if (SPI_gettypeid(tupdesc, fnumber) != typeid)
-		ereport(ERROR, (errcode(ERRCODE_MOST_SPECIFIC_TYPE_MISMATCH),
-		                errmsg("type of column \"%s\" must be \"%i\"", fname, typeid)));
-	datum = SPI_getbinval(tuple, tupdesc, fnumber, &isnull);
-	if (isnull && !allow_null)
-		ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("column \"%s\" must not be null", fname)));
-	return datum;
-}
