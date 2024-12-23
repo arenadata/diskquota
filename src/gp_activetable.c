@@ -1062,7 +1062,7 @@ pull_active_list_from_seg(StringInfoData *active_oids)
 			                       PQresultStatus(pgresult))));
 		}
 
-		/* push the active table oid into oid_map */
+		/* push the active table oid into local_active_table_oid_map */
 		for (j = 0; j < PQntuples(pgresult); j++)
 		{
 			reloid = atooid(PQgetvalue(pgresult, j, 0));
