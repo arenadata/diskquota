@@ -944,6 +944,7 @@ SPI_getbinval_wrapper(HeapTuple tuple, TupleDesc tupdesc, int fnumber, bool allo
 static void
 load_table_size(StringInfoData *active_oids)
 {
+	TupleDesc  tupdesc;
 	SPIPlanPtr plan;
 	Portal     portal;
 
@@ -963,10 +964,10 @@ load_table_size(StringInfoData *active_oids)
 		ereport(ERROR, (errmsg("[diskquota] load_table_size SPI_cursor_fetch failed")));
 	}
 
-	TupleDesc tupdesc     = SPI_tuptable->tupdesc;
-	int       tableid_num = SPI_fnumber_wrapper(tupdesc, "tableid", OIDOID);
-	int       size_num    = SPI_fnumber_wrapper(tupdesc, "size", INT8OID);
-	int       segid_num   = SPI_fnumber_wrapper(tupdesc, "segid", INT2OID);
+	tupdesc         = SPI_tuptable->tupdesc;
+	int tableid_num = SPI_fnumber_wrapper(tupdesc, "tableid", OIDOID);
+	int size_num    = SPI_fnumber_wrapper(tupdesc, "size", INT8OID);
+	int segid_num   = SPI_fnumber_wrapper(tupdesc, "segid", INT2OID);
 
 	while (SPI_processed > 0)
 	{
