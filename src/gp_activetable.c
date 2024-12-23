@@ -956,11 +956,11 @@ load_table_size(StringInfoData *active_oids)
 	tupdesc = SPI_tuptable->tupdesc;
 
 	ereportif(SPI_gettypeid(tupdesc, 0) != OIDOID, ERROR,
-	          (errcode(ERRCODE_MOST_SPECIFIC_TYPE_MISMATCH), errmsg("type of column \"tableid\" must be \"OIDOID\"")));
+	          (errcode(ERRCODE_MOST_SPECIFIC_TYPE_MISMATCH), errmsg("type of column \"tableid\" must be \"OID\"")));
 	ereportif(SPI_gettypeid(tupdesc, 1) != INT8OID, ERROR,
-	          (errcode(ERRCODE_MOST_SPECIFIC_TYPE_MISMATCH), errmsg("type of column \"size\" must be \"INT8OID\"")));
+	          (errcode(ERRCODE_MOST_SPECIFIC_TYPE_MISMATCH), errmsg("type of column \"size\" must be \"INT8\"")));
 	ereportif(SPI_gettypeid(tupdesc, 2) != INT2OID, ERROR,
-	          (errcode(ERRCODE_MOST_SPECIFIC_TYPE_MISMATCH), errmsg("type of column \"segid\" must be \"INT2OID\"")));
+	          (errcode(ERRCODE_MOST_SPECIFIC_TYPE_MISMATCH), errmsg("type of column \"segid\" must be \"INT2\"")));
 
 	Assert(active_oids->len == 0);
 
