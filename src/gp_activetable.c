@@ -973,10 +973,10 @@ load_table_size(StringInfoData *active_oids)
 	{
 		for (uint64 row = 0; row < SPI_processed; row++)
 		{
-			HeapTuple val   = SPI_tuptable->vals[row];
-			Oid       oid   = DatumGetObjectId(SPI_getbinval_wrapper(val, tupdesc, tableid_num, false));
-			int64     size  = DatumGetInt64(SPI_getbinval_wrapper(val, tupdesc, size_num, false));
-			int16     segid = DatumGetInt16(SPI_getbinval_wrapper(val, tupdesc, segid_num, false));
+			HeapTuple tup   = SPI_tuptable->vals[row];
+			Oid       oid   = DatumGetObjectId(SPI_getbinval_wrapper(tup, tupdesc, tableid_num, false));
+			int64     size  = DatumGetInt64(SPI_getbinval_wrapper(tup, tupdesc, size_num, false));
+			int16     segid = DatumGetInt16(SPI_getbinval_wrapper(tup, tupdesc, segid_num, false));
 
 			update_active_table_size(oid, size, segid);
 
