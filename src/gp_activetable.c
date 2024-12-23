@@ -912,18 +912,6 @@ get_active_tables_oid(void)
 	return local_active_table_stats_map;
 }
 
-static int
-SPI_fnumber_wrapper(TupleDesc tupdesc, const char *fname, Oid typeid)
-{
-	int fnumber = SPI_fnumber(tupdesc, fname);
-
-	if (SPI_gettypeid(tupdesc, fnumber) != typeid)
-		ereport(ERROR, (errcode(ERRCODE_MOST_SPECIFIC_TYPE_MISMATCH),
-		                errmsg("type of column \"%s\" must be \"%d\"", fname, typeid)));
-
-	return fnumber;
-}
-
 static Datum
 SPI_getbinval_wrapper(HeapTuple tuple, TupleDesc tupdesc, int fnumber, bool allow_null)
 {
@@ -965,10 +953,14 @@ load_table_size(StringInfoData *active_oids)
 		ereport(ERROR, (errmsg("[diskquota] load_table_size SPI_cursor_fetch failed")));
 	}
 
-	tupdesc         = SPI_tuptable->tupdesc;
-	int tableid_num = SPI_fnumber_wrapper(tupdesc, "tableid", OIDOID);
-	int size_num    = SPI_fnumber_wrapper(tupdesc, "size", INT8OID);
-	int segid_num   = SPI_fnumber_wrapper(tupdesc, "segid", INT2OID);
+	tupdesc = SPI_tuptable->tupdesc;
+
+	ereportif(SPI_gettypeid(tupdesc, 0) != OIDOID, ERROR,
+	          (errcode(ERRCODE_MOST_SPECIFIC_TYPE_MISMATCH), errmsg("type of column \"tableid\" must be \"OIDOID\"")));
+	ereportif(SPI_gettypeid(tupdesc, 1) != INT8OID, ERROR,
+	          (errcode(ERRCODE_MOST_SPECIFIC_TYPE_MISMATCH), errmsg("type of column \"size\" must be \"INT8OID\"")));
+	ereportif(SPI_gettypeid(tupdesc, 2) != INT2OID, ERROR,
+	          (errcode(ERRCODE_MOST_SPECIFIC_TYPE_MISMATCH), errmsg("type of column \"segid\" must be \"INT2OID\"")));
 
 	Assert(active_oids->len == 0);
 
@@ -977,9 +969,9 @@ load_table_size(StringInfoData *active_oids)
 		for (i = 0; i < SPI_processed; i++)
 		{
 			HeapTuple tup   = SPI_tuptable->vals[i];
-			Oid       oid   = DatumGetObjectId(SPI_getbinval_wrapper(tup, tupdesc, tableid_num, false));
-			int64     size  = DatumGetInt64(SPI_getbinval_wrapper(tup, tupdesc, size_num, false));
-			int16     segid = DatumGetInt16(SPI_getbinval_wrapper(tup, tupdesc, segid_num, false));
+			Oid       oid   = DatumGetObjectId(SPI_getbinval_wrapper(tup, tupdesc, 0, false));
+			int64     size  = DatumGetInt64(SPI_getbinval_wrapper(tup, tupdesc, 1, false));
+			int16     segid = DatumGetInt16(SPI_getbinval_wrapper(tup, tupdesc, 2, false));
 
 			update_active_table_size(oid, size, segid);
 
