@@ -970,6 +970,8 @@ load_table_size(StringInfoData *active_oids)
 	int size_num    = SPI_fnumber_wrapper(tupdesc, "size", INT8OID);
 	int segid_num   = SPI_fnumber_wrapper(tupdesc, "segid", INT2OID);
 
+	Assert(active_oids->len == 0);
+
 	while (SPI_processed > 0)
 	{
 		for (i = 0; i < SPI_processed; i++)
@@ -1009,6 +1011,8 @@ convert_map_to_string(HTAB *map, StringInfoData *buf)
 	Oid            *oid;
 
 	hash_seq_init(&iter, map);
+
+	Assert(buf->len == 0);
 
 	while ((oid = hash_seq_search(&iter)) != NULL)
 	{
