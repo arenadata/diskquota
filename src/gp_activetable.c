@@ -89,7 +89,7 @@ static HTAB *get_active_tables_stats(ArrayType *array);
 static HTAB *get_active_tables_oid(void);
 static void  pull_active_list_from_seg(StringInfoData *active_oids);
 static void  pull_active_table_size_from_seg(const char *active_oids);
-static void  convert_map_to_string(HTAB *map, StringInfoData *buf);
+static void  convert_map_to_string(HTAB *local_active_table_oid_maps, StringInfoData *buf);
 static void  load_table_size(StringInfoData *active_oids);
 static void  report_active_table_helper(const RelFileNodeBackend *relFileNode);
 static void  remove_from_active_table_map(const RelFileNodeBackend *relFileNode);
@@ -1005,19 +1005,19 @@ load_table_size(StringInfoData *active_oids)
  * of function diskquota_fetch_table_stat.
  */
 static void
-convert_map_to_string(HTAB *map, StringInfoData *buf)
+convert_map_to_string(HTAB *local_active_table_oid_maps, StringInfoData *active_oids)
 {
 	HASH_SEQ_STATUS iter;
 	Oid            *oid;
 
-	hash_seq_init(&iter, map);
+	hash_seq_init(&iter, local_active_table_oid_maps);
 
-	Assert(buf->len == 0);
+	Assert(active_oids->len == 0);
 
 	while ((oid = hash_seq_search(&iter)) != NULL)
 	{
-		if (buf->len > 0) appendStringInfoString(buf, ",");
-		appendStringInfo(buf, "%d", *oid);
+		if (active_oids->len > 0) appendStringInfoString(active_oids, ",");
+		appendStringInfo(active_oids, "%d", *oid);
 	}
 }
 
