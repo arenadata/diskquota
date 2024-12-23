@@ -1088,6 +1088,8 @@ pull_active_table_size_from_seg(const char *active_oids)
 	} * oid_size;
 	CdbPgResults   cdb_pgresults = {NULL, 0};
 	StringInfoData sql;
+	int            i;
+	int            j;
 	HASHCTL        ctl = {.keysize = sizeof(Oid), .entrysize = sizeof(*oid_size), .hcxt = CurrentMemoryContext};
 	HTAB *map = diskquota_hash_create("local active table map with size info", 1024, &ctl, HASH_ELEM | HASH_CONTEXT,
 	                                  DISKQUOTA_OID_HASH);
@@ -1098,9 +1100,9 @@ pull_active_table_size_from_seg(const char *active_oids)
 	pfree(sql.data);
 	Assert(SEGCOUNT == cdb_pgresults.numResults);
 
-	for (int16 segid = 0; segid < SEGCOUNT; segid++)
+	for (i = 0; i < cdb_pgresults.numResults; i++)
 	{
-		PGresult *pgresult   = cdb_pgresults.pg_results[segid];
+		PGresult *pgresult   = cdb_pgresults.pg_results[i];
 		int       TABLE_OID  = PQfnumber(pgresult, "\"TABLE_OID\"");
 		int       TABLE_SIZE = PQfnumber(pgresult, "\"TABLE_SIZE\"");
 #ifdef USE_ASSERT_CHECKING
@@ -1114,14 +1116,14 @@ pull_active_table_size_from_seg(const char *active_oids)
 			                       PQresultStatus(pgresult))));
 		}
 
-		for (int row = 0; row < PQntuples(pgresult); row++)
+		for (j = 0; j < PQntuples(pgresult); j++)
 		{
 			bool  found;
-			Oid   oid  = atooid(PQgetvalue(pgresult, row, TABLE_OID));
-			int64 size = atoll(PQgetvalue(pgresult, row, TABLE_SIZE));
-			Assert(segid == atoi(PQgetvalue(pgresult, row, GP_SEGMENT_ID)));
+			Oid   oid  = atooid(PQgetvalue(pgresult, j, TABLE_OID));
+			int64 size = atoll(PQgetvalue(pgresult, j, TABLE_SIZE));
+			Assert(i == atoi(PQgetvalue(pgresult, j, GP_SEGMENT_ID)));
 
-			update_active_table_size(oid, size, segid);
+			update_active_table_size(oid, size, i);
 			oid_size = hash_search(map, &oid, HASH_ENTER, &found);
 			/* tablesize for master is the sum of tablesize of master and all segments */
 			oid_size->size = (found ? oid_size->size : 0) + size;
