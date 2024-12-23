@@ -1086,17 +1086,18 @@ pull_active_table_size_from_seg(const char *active_oids)
 		int64 size;
 	} * oid_size;
 	CdbPgResults   cdb_pgresults = {NULL, 0};
-	StringInfoData sql;
+	StringInfoData sql_command;
 	int            i;
 	int            j;
 	HASHCTL        ctl = {.keysize = sizeof(Oid), .entrysize = sizeof(*oid_size), .hcxt = CurrentMemoryContext};
 	HTAB *map = diskquota_hash_create("local active table map with size info", 1024, &ctl, HASH_ELEM | HASH_CONTEXT,
 	                                  DISKQUOTA_OID_HASH);
 
-	initStringInfo(&sql);
-	appendStringInfo(&sql, "select * from diskquota.diskquota_fetch_table_stat(1, ARRAY[%s]::oid[])", active_oids);
-	CdbDispatchCommand(sql.data, DF_NONE, &cdb_pgresults);
-	pfree(sql.data);
+	initStringInfo(&sql_command);
+	appendStringInfo(&sql_command, "select * from diskquota.diskquota_fetch_table_stat(1, ARRAY[%s]::oid[])",
+	                 active_oids);
+	CdbDispatchCommand(sql_command.data, DF_NONE, &cdb_pgresults);
+	pfree(sql_command.data);
 	Assert(SEGCOUNT == cdb_pgresults.numResults);
 
 	for (i = 0; i < cdb_pgresults.numResults; i++)
