@@ -912,18 +912,6 @@ get_active_tables_oid(void)
 	return local_active_table_stats_map;
 }
 
-static Datum
-SPI_getbinval_wrapper(HeapTuple tuple, TupleDesc tupdesc, int fnumber, bool allow_null)
-{
-	bool  isnull;
-	Datum datum = SPI_getbinval(tuple, tupdesc, fnumber, &isnull);
-
-	if (isnull && !allow_null)
-		ereport(ERROR, (errcode(ERRCODE_NULL_VALUE_NOT_ALLOWED), errmsg("column %d must not be null", fnumber)));
-
-	return datum;
-}
-
 /*
  * Load table size info from diskquota.table_size table.
  * This is called when system startup, disk quota rejectmap
@@ -955,11 +943,11 @@ load_table_size(StringInfoData *active_oids)
 
 	tupdesc = SPI_tuptable->tupdesc;
 
-	ereportif(SPI_gettypeid(tupdesc, 0) != OIDOID, ERROR,
+	ereportif(SPI_gettypeid(tupdesc, 1) != OIDOID, ERROR,
 	          (errcode(ERRCODE_MOST_SPECIFIC_TYPE_MISMATCH), errmsg("type of column \"tableid\" must be \"OID\"")));
-	ereportif(SPI_gettypeid(tupdesc, 1) != INT8OID, ERROR,
+	ereportif(SPI_gettypeid(tupdesc, 2) != INT8OID, ERROR,
 	          (errcode(ERRCODE_MOST_SPECIFIC_TYPE_MISMATCH), errmsg("type of column \"size\" must be \"INT8\"")));
-	ereportif(SPI_gettypeid(tupdesc, 2) != INT2OID, ERROR,
+	ereportif(SPI_gettypeid(tupdesc, 3) != INT2OID, ERROR,
 	          (errcode(ERRCODE_MOST_SPECIFIC_TYPE_MISMATCH), errmsg("type of column \"segid\" must be \"INT2\"")));
 
 	Assert(active_oids->len == 0);
@@ -968,17 +956,30 @@ load_table_size(StringInfoData *active_oids)
 	{
 		for (i = 0; i < SPI_processed; i++)
 		{
-			HeapTuple tup   = SPI_tuptable->vals[i];
-			Oid       oid   = DatumGetObjectId(SPI_getbinval_wrapper(tup, tupdesc, 0, false));
-			int64     size  = DatumGetInt64(SPI_getbinval_wrapper(tup, tupdesc, 1, false));
-			int16     segid = DatumGetInt16(SPI_getbinval_wrapper(tup, tupdesc, 2, false));
+			HeapTuple tup = SPI_tuptable->vals[i];
+			Datum     dat;
+			Oid       reloid;
+			int64     size;
+			int16     segid;
+			bool      isnull;
 
-			update_active_table_size(oid, size, segid);
+			dat = SPI_getbinval(tup, tupdesc, 1, &isnull);
+			if (isnull) continue;
+			reloid = DatumGetObjectId(dat);
+
+			dat = SPI_getbinval(tup, tupdesc, 2, &isnull);
+			if (isnull) continue;
+			size = DatumGetInt64(dat);
+			dat  = SPI_getbinval(tup, tupdesc, 3, &isnull);
+			if (isnull) continue;
+			segid = DatumGetInt16(dat);
+
+			update_active_table_size(reloid, size, segid);
 
 			if (segid == -1)
 			{
 				if (active_oids->len > 0) appendStringInfoString(active_oids, ",");
-				appendStringInfo(active_oids, "%d", oid);
+				appendStringInfo(active_oids, "%d", reloid);
 			}
 		}
 		SPI_freetuptable(SPI_tuptable);
