@@ -1101,12 +1101,7 @@ pull_active_table_size_from_seg(const char *active_oids)
 
 	for (i = 0; i < cdb_pgresults.numResults; i++)
 	{
-		PGresult *pgresult   = cdb_pgresults.pg_results[i];
-		int       TABLE_OID  = PQfnumber(pgresult, "\"TABLE_OID\"");
-		int       TABLE_SIZE = PQfnumber(pgresult, "\"TABLE_SIZE\"");
-#ifdef USE_ASSERT_CHECKING
-		int GP_SEGMENT_ID = PQfnumber(pgresult, "\"GP_SEGMENT_ID\"");
-#endif
+		PGresult *pgresult = cdb_pgresults.pg_results[i];
 
 		if (PQresultStatus(pgresult) != PGRES_TUPLES_OK)
 		{
@@ -1118,9 +1113,9 @@ pull_active_table_size_from_seg(const char *active_oids)
 		for (j = 0; j < PQntuples(pgresult); j++)
 		{
 			bool  found;
-			Oid   oid  = atooid(PQgetvalue(pgresult, j, TABLE_OID));
-			int64 size = atoll(PQgetvalue(pgresult, j, TABLE_SIZE));
-			Assert(i == atoi(PQgetvalue(pgresult, j, GP_SEGMENT_ID)));
+			Oid   oid  = atooid(PQgetvalue(pgresult, j, 0));
+			int64 size = atoll(PQgetvalue(pgresult, j, 1));
+			Assert(i == atoi(PQgetvalue(pgresult, j, 2)));
 
 			update_active_table_size(oid, size, i);
 			oid_size = hash_search(map, &oid, HASH_ENTER, &found);
