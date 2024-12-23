@@ -1031,6 +1031,7 @@ static void
 pull_active_list_from_seg(StringInfoData *active_oids)
 {
 	CdbPgResults cdb_pgresults = {NULL, 0};
+	int          i, j;
 
 	HASHCTL ctl = {.keysize = sizeof(Oid), .entrysize = sizeof(Oid), .hcxt = CurrentMemoryContext};
 	HTAB   *map = diskquota_hash_create("local active table map with relfilenode info", 1024, &ctl,
@@ -1043,10 +1044,10 @@ pull_active_list_from_seg(StringInfoData *active_oids)
 	CdbDispatchCommand(sql, DF_NONE, &cdb_pgresults);
 	Assert(SEGCOUNT == cdb_pgresults.numResults);
 
-	for (int16 segid = 0; segid < SEGCOUNT; segid++)
+	for (i = 0; i < cdb_pgresults.numResults; i++)
 	{
-		PGresult *pgresult  = cdb_pgresults.pg_results[segid];
-		int       TABLE_OID = PQfnumber(pgresult, "\"TABLE_OID\"");
+		Oid       reloid;
+		PGresult *pgresult = cdb_pgresults.pg_results[i];
 
 		if (PQresultStatus(pgresult) != PGRES_TUPLES_OK)
 		{
@@ -1056,10 +1057,10 @@ pull_active_list_from_seg(StringInfoData *active_oids)
 		}
 
 		/* push the active table oid into oid_map */
-		for (int row = 0; row < PQntuples(pgresult); row++)
+		for (j = 0; j < PQntuples(pgresult); j++)
 		{
-			Oid oid = atooid(PQgetvalue(pgresult, row, TABLE_OID));
-			(void)hash_search(map, &oid, HASH_ENTER, NULL);
+			reloid = atooid(PQgetvalue(pgresult, j, 0));
+			(void)hash_search(map, &reloid, HASH_ENTER, NULL);
 		}
 	}
 	cdbdisp_clearCdbPgResults(&cdb_pgresults);
