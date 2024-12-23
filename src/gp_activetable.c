@@ -945,6 +945,7 @@ static void
 load_table_size(StringInfoData *active_oids)
 {
 	TupleDesc  tupdesc;
+	int        i;
 	SPIPlanPtr plan;
 	Portal     portal;
 
@@ -971,9 +972,9 @@ load_table_size(StringInfoData *active_oids)
 
 	while (SPI_processed > 0)
 	{
-		for (uint64 row = 0; row < SPI_processed; row++)
+		for (i = 0; i < SPI_processed; i++)
 		{
-			HeapTuple tup   = SPI_tuptable->vals[row];
+			HeapTuple tup   = SPI_tuptable->vals[i];
 			Oid       oid   = DatumGetObjectId(SPI_getbinval_wrapper(tup, tupdesc, tableid_num, false));
 			int64     size  = DatumGetInt64(SPI_getbinval_wrapper(tup, tupdesc, size_num, false));
 			int16     segid = DatumGetInt16(SPI_getbinval_wrapper(tup, tupdesc, segid_num, false));
