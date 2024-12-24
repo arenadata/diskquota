@@ -924,10 +924,8 @@ load_table_size(StringInfoData *active_oids)
 	int        i;
 	SPIPlanPtr plan;
 	Portal     portal;
-
-	static const char *sql = "select tableid, size, segid from diskquota.table_size";
-
-	bool connected_in_this_function = SPI_connect_if_not_yet();
+	char      *sql                        = "select tableid, size, segid from diskquota.table_size";
+	bool       connected_in_this_function = SPI_connect_if_not_yet();
 
 	if ((plan = SPI_prepare(sql, 0, NULL)) == NULL)
 		ereport(ERROR, (errmsg("[diskquota] SPI_prepare(\"%s\") failed", sql)));
