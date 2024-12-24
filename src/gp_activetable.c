@@ -1070,9 +1070,9 @@ pull_active_list_from_seg(StringInfoData *active_oids)
 
 typedef struct OidSize
 {
-	Oid  oid;
-	Size size;
-} OidSize;
+	Oid  reloid;
+	Size tablesize;
+} ActiveTableEntry;
 
 /*
  * Get active table list from all the segments.
@@ -1086,14 +1086,14 @@ typedef struct OidSize
 static void
 pull_active_table_size_from_seg(const char *active_oids)
 {
-	OidSize       *oid_size;
-	CdbPgResults   cdb_pgresults = {NULL, 0};
-	StringInfoData sql_command;
-	int            i;
-	int            j;
-	HASHCTL        ctl = {.keysize = sizeof(Oid), .entrysize = sizeof(OidSize), .hcxt = CurrentMemoryContext};
-	HTAB *map = diskquota_hash_create("local active table map with size info", 1024, &ctl, HASH_ELEM | HASH_CONTEXT,
-	                                  DISKQUOTA_OID_HASH);
+	ActiveTableEntry *entry;
+	CdbPgResults      cdb_pgresults = {NULL, 0};
+	StringInfoData    sql_command;
+	int               i;
+	int               j;
+	HASHCTL ctl = {.keysize = sizeof(Oid), .entrysize = sizeof(ActiveTableEntry), .hcxt = CurrentMemoryContext};
+	HTAB   *local_table_stats_map = diskquota_hash_create("local active table map with size info", 1024, &ctl,
+	                                                      HASH_ELEM | HASH_CONTEXT, DISKQUOTA_OID_HASH);
 
 	initStringInfo(&sql_command);
 	appendStringInfo(&sql_command, "select * from diskquota.diskquota_fetch_table_stat(1, ARRAY[%s]::oid[])",
@@ -1107,7 +1107,7 @@ pull_active_table_size_from_seg(const char *active_oids)
 		ereport(ERROR, (errmsg("[diskquota] there is no active segment, SEGCOUNT is %d", SEGCOUNT)));
 	}
 
-	/* sum table size from each segment into oid_size map */
+	/* sum table size from each segment into local_table_stats_map */
 	for (i = 0; i < cdb_pgresults.numResults; i++)
 	{
 		Size tableSize;
@@ -1131,22 +1131,22 @@ pull_active_table_size_from_seg(const char *active_oids)
 			segId     = atoi(PQgetvalue(pgresult, j, 2));
 
 			update_active_table_size(reloid, tableSize, segId);
-			oid_size = hash_search(map, &reloid, HASH_ENTER, &found);
+			entry = hash_search(local_table_stats_map, &reloid, HASH_ENTER, &found);
 
 			/* tablesize for master is the sum of tablesize of master and all segments */
-			oid_size->size = (found ? oid_size->size : 0) + tableSize;
+			entry->tablesize = (found ? entry->tablesize : 0) + tableSize;
 		}
 	}
 	cdbdisp_clearCdbPgResults(&cdb_pgresults);
 
 	HASH_SEQ_STATUS iter;
 
-	hash_seq_init(&iter, map);
+	hash_seq_init(&iter, local_table_stats_map);
 
-	while ((oid_size = hash_seq_search(&iter)) != NULL)
+	while ((entry = hash_seq_search(&iter)) != NULL)
 	{
-		update_active_table_size(oid_size->oid, oid_size->size, -1);
+		update_active_table_size(entry->reloid, entry->tablesize, -1);
 	}
 
-	hash_destroy(map);
+	hash_destroy(local_table_stats_map);
 }
