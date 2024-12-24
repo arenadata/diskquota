@@ -1100,10 +1100,21 @@ pull_active_table_size_from_seg(const char *active_oids)
 	                 active_oids);
 	CdbDispatchCommand(sql_command.data, DF_NONE, &cdb_pgresults);
 	pfree(sql_command.data);
-	Assert(SEGCOUNT == cdb_pgresults.numResults);
 
+	SEGCOUNT = cdb_pgresults.numResults;
+	if (SEGCOUNT <= 0)
+	{
+		ereport(ERROR, (errmsg("[diskquota] there is no active segment, SEGCOUNT is %d", SEGCOUNT)));
+	}
+
+	/* sum table size from each segment into oid_size map */
 	for (i = 0; i < cdb_pgresults.numResults; i++)
 	{
+		Size tableSize;
+		bool found;
+		Oid  reloid;
+		int  segId;
+
 		PGresult *pgresult = cdb_pgresults.pg_results[i];
 
 		if (PQresultStatus(pgresult) != PGRES_TUPLES_OK)
@@ -1115,15 +1126,15 @@ pull_active_table_size_from_seg(const char *active_oids)
 
 		for (j = 0; j < PQntuples(pgresult); j++)
 		{
-			bool  found;
-			Oid   oid  = atooid(PQgetvalue(pgresult, j, 0));
-			int64 size = atoll(PQgetvalue(pgresult, j, 1));
-			Assert(i == atoi(PQgetvalue(pgresult, j, 2)));
+			reloid    = atooid(PQgetvalue(pgresult, j, 0));
+			tableSize = atoll(PQgetvalue(pgresult, j, 1));
+			segId     = atoi(PQgetvalue(pgresult, j, 2));
 
-			update_active_table_size(oid, size, i);
-			oid_size = hash_search(map, &oid, HASH_ENTER, &found);
+			update_active_table_size(reloid, tableSize, segId);
+			oid_size = hash_search(map, &reloid, HASH_ENTER, &found);
+
 			/* tablesize for master is the sum of tablesize of master and all segments */
-			oid_size->size = (found ? oid_size->size : 0) + size;
+			oid_size->size = (found ? oid_size->size : 0) + tableSize;
 		}
 	}
 	cdbdisp_clearCdbPgResults(&cdb_pgresults);
