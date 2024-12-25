@@ -933,7 +933,7 @@ update_active_table_size(Oid oid, int64 size, int16 segid)
 	if (tsentry == NULL)
 	{
 		/* Too many tables have been added to the table_size_map, to avoid diskquota using
-		   too much share memory, just quit the loop. The diskquota won't work correctly
+		   too much share memory, just return. The diskquota won't work correctly
 		   anymore. */
 		return;
 	}
