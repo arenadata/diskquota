@@ -825,8 +825,12 @@ refresh_disk_quota_usage(bool is_init)
 		/*
 		 * initialization stage all the tables are active. later loop, only the
 		 * tables whose disk size changed will be treated as active
+		 *
+		 * active_oids only contains the active tables which belong
+		 * to the current database.
 		 */
 		gp_fetch_active_tables(is_init, &active_oids);
+		bool hasActiveTable = (active_oids.len > 0);
 		/* TODO: if we can skip the following steps when there is no active table */
 		/* recalculate the disk usage of table, schema and role */
 		calculate_table_disk_usage(is_init);
@@ -842,7 +846,7 @@ refresh_disk_quota_usage(bool is_init)
 		 * Otherwise, only when the rejectmap is changed or the active_table_list is
 		 * not empty the rejectmap should be dispatched to segments.
 		 */
-		if (is_init || (diskquota_hardlimit && (reject_map_changed || active_oids.len > 0)))
+		if (is_init || (diskquota_hardlimit && (reject_map_changed || hasActiveTable)))
 			dispatch_rejectmap(active_oids.data);
 	}
 	PG_CATCH();
