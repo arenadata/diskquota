@@ -969,8 +969,6 @@ calculate_active_table_disk_usage(Oid oid, int64 size, int16 segid)
 }
 
 /*
- *  Incremental way to update the disk quota of every database objects
- *  Recalculate the table's disk usage when it's a new table or active table.
  *  Detect the removed table if it's no longer in pg_class.
  *  If change happens, no matter size change or owner change,
  *  update namespace_size_map and role_size_map correspondingly.
