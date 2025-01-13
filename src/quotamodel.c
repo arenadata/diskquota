@@ -919,9 +919,6 @@ get_table_size_map_entry(Oid oid, int16 segid)
 		for (int j = seg_st; j < seg_ed; j++) TableSizeEntrySetFlushFlag(tsentry, j);
 	}
 
-	/* mark tsentry is_exist */
-	if (tsentry) set_table_size_entry_flag(tsentry, TABLE_EXIST);
-
 	return tsentry;
 }
 
@@ -1075,6 +1072,9 @@ calculate_table_disk_usage(bool is_init)
 				   anymore. */
 				break;
 			}
+
+			/* mark tsentry is_exist */
+			if (tsentry) set_table_size_entry_flag(tsentry, TABLE_EXIST);
 
 			/* table size info doesn't need to flush at init quota model stage */
 			if (is_init)
