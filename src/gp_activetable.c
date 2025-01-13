@@ -1061,12 +1061,6 @@ pull_active_list_from_seg(StringInfoData *active_oids)
 	hash_destroy(local_active_table_oid_map);
 }
 
-typedef struct OidSize
-{
-	Oid  reloid;
-	Size tablesize;
-} ActiveTableEntry;
-
 /*
  * Get active table list from all the segments.
  * Since when loading data, there is case where only subset for
@@ -1079,12 +1073,12 @@ typedef struct OidSize
 static void
 pull_active_table_size_from_seg(const char *active_oids)
 {
-	ActiveTableEntry *entry;
-	CdbPgResults      cdb_pgresults = {NULL, 0};
-	StringInfoData    sql_command;
-	int               i;
-	int               j;
-	HASHCTL ctl = {.keysize = sizeof(Oid), .entrysize = sizeof(ActiveTableEntry), .hcxt = CurrentMemoryContext};
+	ActiveTableEntryCombined *entry;
+	CdbPgResults              cdb_pgresults = {NULL, 0};
+	StringInfoData            sql_command;
+	int                       i;
+	int                       j;
+	HASHCTL ctl = {.keysize = sizeof(Oid), .entrysize = sizeof(ActiveTableEntryCombined), .hcxt = CurrentMemoryContext};
 	HTAB   *local_table_stats_map = diskquota_hash_create("local active table map with size info", 1024, &ctl,
 	                                                      HASH_ELEM | HASH_CONTEXT, DISKQUOTA_OID_HASH);
 
