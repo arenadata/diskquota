@@ -972,7 +972,7 @@ load_table_size(StringInfoData *active_oids)
 			if (isnull) continue;
 			segid = DatumGetInt16(dat);
 
-			update_active_table_size(reloid, size, segid);
+			calculate_active_table_disk_usage(reloid, size, segid);
 
 			if (segid == -1)
 			{
@@ -1117,7 +1117,7 @@ pull_active_table_size_from_seg(const char *active_oids)
 			tableSize = atoll(PQgetvalue(pgresult, j, 1));
 			segId     = atoi(PQgetvalue(pgresult, j, 2));
 
-			update_active_table_size(reloid, tableSize, segId);
+			calculate_active_table_disk_usage(reloid, tableSize, segId);
 			entry = hash_search(local_table_stats_map, &reloid, HASH_ENTER, &found);
 
 			/* tablesize for master is the sum of tablesize of master and all segments */
@@ -1132,7 +1132,7 @@ pull_active_table_size_from_seg(const char *active_oids)
 
 	while ((entry = hash_seq_search(&iter)) != NULL)
 	{
-		update_active_table_size(entry->reloid, entry->tablesize, -1);
+		calculate_active_table_disk_usage(entry->reloid, entry->tablesize, -1);
 	}
 
 	hash_destroy(local_table_stats_map);

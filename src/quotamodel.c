@@ -924,7 +924,7 @@ get_table_size_map_entry(Oid oid, int16 segid)
 }
 
 void
-update_active_table_size(Oid oid, int64 size, int16 segid)
+calculate_active_table_disk_usage(Oid oid, int64 size, int16 segid)
 {
 	TableSizeEntry *tsentry = get_table_size_map_entry(oid, segid);
 
