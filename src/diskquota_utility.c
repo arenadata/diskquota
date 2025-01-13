@@ -1268,33 +1268,25 @@ out:
  * Get the list of oids of the tables which diskquota
  * needs to care about in the database.
  * Firstly the all the table oids which relkind is 'r'
- * or 'm' and not system table. On init stage, oids from
- * diskquota.table_size are added to invalidate them.
+ * or 'm' and not system table.
  * Then, fetch the indexes of those tables.
  */
 
 List *
-get_rel_oid_list(bool is_init)
+get_rel_oid_list(void)
 {
 	List *oidlist                    = NIL;
 	bool  connected_in_this_function = SPI_connect_if_not_yet();
+	int   ret;
 
-#define SELECT_FROM_PG_CATALOG_PG_CLASS "select oid from pg_catalog.pg_class where oid >= $1 and relkind in ('r', 'm')"
-
-	int ret = SPI_execute_with_args(is_init ? SELECT_FROM_PG_CATALOG_PG_CLASS
-	                                        " union distinct"
-	                                        " select tableid from diskquota.table_size where segid = -1"
-	                                        : SELECT_FROM_PG_CATALOG_PG_CLASS,
-	                                1,
-	                                (Oid[]){
-	                                        OIDOID,
-	                                },
-	                                (Datum[]){
-	                                        ObjectIdGetDatum(FirstNormalObjectId),
-	                                },
-	                                NULL, false, 0);
-
-#undef SELECT_FROM_PG_CATALOG_PG_CLASS
+	ret = SPI_execute_with_args("select oid from pg_class where oid >= $1 and (relkind='r' or relkind='m')", 1,
+	                            (Oid[]){
+	                                    OIDOID,
+	                            },
+	                            (Datum[]){
+	                                    ObjectIdGetDatum(FirstNormalObjectId),
+	                            },
+	                            NULL, false, 0);
 
 	if (ret != SPI_OK_SELECT) elog(ERROR, "cannot fetch in pg_class. error code %d", ret);
 

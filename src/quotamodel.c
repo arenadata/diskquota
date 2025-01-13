@@ -981,7 +981,6 @@ calculate_table_disk_usage(bool is_init)
 	HASH_SEQ_STATUS iter;
 	List           *oidlist;
 	ListCell       *l;
-	DeleteArrays delete = {0};
 
 	/*
 	 * unset is_exist flag for tsentry in table_size_map this is used to
@@ -998,7 +997,7 @@ calculate_table_disk_usage(bool is_init)
 	 * calculate the file size for active table and update namespace_size_map
 	 * and role_size_map
 	 */
-	oidlist = get_rel_oid_list(is_init);
+	oidlist = get_rel_oid_list();
 
 	oidlist = merge_uncommitted_table_to_oidlist(oidlist);
 
@@ -1032,21 +1031,6 @@ calculate_table_disk_usage(bool is_init)
 			{
 				elog(WARNING, "cache lookup failed for relation %u", relOid);
 				LWLockRelease(diskquota_locks.relation_cache_lock);
-
-				if (!is_init) continue;
-
-				for (int i = -1; i < SEGCOUNT; i++)
-				{
-					delete.tableids = accumArrayResult(delete.tableids, ObjectIdGetDatum(relOid), false, OIDOID,
-					                                   CurrentMemoryContext);
-					delete.segids =
-					        accumArrayResult(delete.segids, Int16GetDatum(i), false, INT2OID, CurrentMemoryContext);
-
-					if (delete.tableids->nelems > SQL_MAX_VALUES_NUMBER)
-					{
-						delete_from_table_size_map(&delete);
-					}
-				}
 
 				continue;
 			}
@@ -1119,11 +1103,6 @@ calculate_table_disk_usage(bool is_init)
 		{
 			heap_freetuple(classTup);
 		}
-	}
-
-	if (delete.tableids)
-	{
-		delete_from_table_size_map(&delete);
 	}
 
 	list_free(oidlist);
