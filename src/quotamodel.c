@@ -923,6 +923,10 @@ get_table_size_map_entry(Oid oid, int16 segid)
 	return tsentry;
 }
 
+/*
+ *  Incremental way to update the disk quota of every active tables.
+ *  Recalculate the table's disk usage when it's an active table.
+ */
 void
 calculate_active_table_disk_usage(Oid oid, int64 size, int16 segid)
 {
