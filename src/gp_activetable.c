@@ -952,6 +952,7 @@ load_table_size(StringInfoData *active_oids)
 
 	while (SPI_processed > 0)
 	{
+		/* push the table oid to active_oids and size into table_size_map */
 		for (i = 0; i < SPI_processed; i++)
 		{
 			HeapTuple tup = SPI_tuptable->vals[i];
