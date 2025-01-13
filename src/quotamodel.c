@@ -252,9 +252,6 @@ typedef struct
 	ArrayBuildState *segids;
 } UpdateArrays;
 
-static void delete_from_table_size_map(DeleteArrays *arrays);
-static void update_table_size_map(UpdateArrays *arrays);
-
 /* add a new entry quota or update the old entry quota */
 static void
 update_size_for_quota(int64 size, QuotaType type, Oid *keys, int16 segid)
