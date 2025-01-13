@@ -898,7 +898,7 @@ merge_uncommitted_table_to_oidlist(List *oidlist)
 }
 
 static TableSizeEntry *
-get_tsentry(Oid oid, int16 segid)
+get_table_size_map_entry(Oid oid, int16 segid)
 {
 	bool              found;
 	TableSizeEntryKey key     = {.reloid = oid, .id = TableSizeEntryId(segid)};
@@ -928,7 +928,7 @@ get_tsentry(Oid oid, int16 segid)
 void
 update_active_table_size(Oid oid, int64 size, int16 segid)
 {
-	TableSizeEntry *tsentry = get_tsentry(oid, segid);
+	TableSizeEntry *tsentry = get_table_size_map_entry(oid, segid);
 
 	if (tsentry == NULL)
 	{
@@ -1066,7 +1066,7 @@ calculate_table_disk_usage(bool is_init)
 		 */
 		for (int cur_segid = -1; cur_segid < SEGCOUNT; cur_segid++)
 		{
-			tsentry = get_tsentry(relOid, cur_segid);
+			tsentry = get_table_size_map_entry(relOid, cur_segid);
 
 			if (tsentry == NULL)
 			{
