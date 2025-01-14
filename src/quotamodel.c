@@ -220,7 +220,7 @@ static void transfer_table_for_quota(int64 totalsize, QuotaType type, Oid *old_k
 
 /* functions to refresh disk quota model*/
 static void refresh_disk_quota_usage(bool is_init);
-static void calculate_table_disk_usage(bool is_init);
+static void calculate_schema_and_role_disk_usage(bool is_init);
 static void flush_to_table_size(void);
 static bool flush_local_reject_map(void);
 static void dispatch_rejectmap(const char *active_oids);
@@ -832,8 +832,8 @@ refresh_disk_quota_usage(bool is_init)
 		gp_fetch_active_tables(is_init, &active_oids);
 		bool hasActiveTable = (active_oids.len > 0);
 		/* TODO: if we can skip the following steps when there is no active table */
-		/* recalculate the disk usage of table, schema and role */
-		calculate_table_disk_usage(is_init);
+		/* recalculate the disk usage of schema and role */
+		calculate_schema_and_role_disk_usage(is_init);
 		/* refresh quota_info_map */
 		refresh_quota_info_map();
 		/* flush local table_size_map to user table table_size */
@@ -969,6 +969,7 @@ calculate_active_table_disk_usage(Oid oid, int64 size, int16 segid)
 }
 
 /*
+ *  Recalculate the schema and role disk usage.
  *  Detect the removed table if it's no longer in pg_class.
  *  If change happens, no matter size change or owner change,
  *  update namespace_size_map and role_size_map correspondingly.
@@ -977,7 +978,7 @@ calculate_active_table_disk_usage(Oid oid, int64 size, int16 segid)
  */
 
 static void
-calculate_table_disk_usage(bool is_init)
+calculate_schema_and_role_disk_usage(bool is_init)
 {
 	TableSizeEntry *tsentry = NULL;
 	Oid             relOid;

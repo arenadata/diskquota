@@ -1048,7 +1048,7 @@ pull_active_list_from_seg(StringInfoData *active_oids)
 	Assert(active_oids->len == 0);
 
 	/*
-	 * Convert a hash map with oids into a string array
+	 * Convert a hash map with oids into a string array.
 	 * This is used to prepare the second array parameter
 	 * of function diskquota_fetch_table_stat.
 	 */
