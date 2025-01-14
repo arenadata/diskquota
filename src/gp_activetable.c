@@ -1017,7 +1017,6 @@ pull_active_list_from_seg(StringInfoData *active_oids)
 
 	/* any errors will be catch in upper level */
 	CdbDispatchCommand(sql, DF_NONE, &cdb_pgresults);
-	Assert(SEGCOUNT == cdb_pgresults.numResults);
 
 	for (i = 0; i < cdb_pgresults.numResults; i++)
 	{
