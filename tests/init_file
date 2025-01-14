@@ -45,4 +45,20 @@ s/ERROR:  tablespace: \d+, schema: \d+ diskquota exceeded.*/[hardlimit] tablespa
 m/^ERROR:  Can not set disk quota for system owner:.*/
 s/^ERROR:  Can not set disk quota for system owner:.*/ERROR:  Can not set disk quota from system owner:/
 
+# GPDB 7 differences
+m/CREATE EXTENSION$/
+s/CREATE EXTENSION$/CREATE/
+m/DROP EXTENSION$/
+s/DROP EXTENSION$/DROP/
+m/CREATE SCHEMA$/
+s/CREATE SCHEMA$/CREATE/
+m/CREATE TABLE$/
+s/CREATE TABLE$/CREATE/
+m/INSERT 0 \d+$/
+s/INSERT 0 (\d+)$/INSERT $1/
+m/DROP SCHEMA$/
+s/DROP SCHEMA$/DROP/
+m/DROP TABLE$/
+s/DROP TABLE$/DROP/
+
 -- end_matchsubs

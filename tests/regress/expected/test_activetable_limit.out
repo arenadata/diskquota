@@ -16,7 +16,11 @@ INSERT INTO a03 values(generate_series(0, 500));
 CREATE EXTENSION diskquota;
 -- we only read the current log file
 CREATE EXTERNAL WEB TABLE segment_logs(line text)
-    EXECUTE 'cat $GP_SEG_DATADIR/pg_log/$(ls -Art $GP_SEG_DATADIR/pg_log | tail -n 1)'
+    EXECUTE 'if [ -d "$GP_SEG_DATADIR/pg_log" ]; then 
+            cat $GP_SEG_DATADIR/pg_log/$(ls -Art $GP_SEG_DATADIR/pg_log | tail -n 1)
+        else
+            cat $GP_SEG_DATADIR/log/$(ls -Art $GP_SEG_DATADIR/log | tail -n 1)
+        fi'
     ON ALL FORMAT 'TEXT' (DELIMITER 'OFF');
 CREATE SCHEMA s;
 SELECT diskquota.set_schema_quota('s', '1 MB');
