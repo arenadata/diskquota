@@ -926,6 +926,8 @@ load_table_size(StringInfoData *active_oids)
 	char      *sql                        = "select tableid, size, segid from diskquota.table_size";
 	bool       connected_in_this_function = SPI_connect_if_not_yet();
 
+	Assert(active_oids->len == 0);
+
 	if ((plan = SPI_prepare(sql, 0, NULL)) == NULL)
 		ereport(ERROR, (errmsg("[diskquota] SPI_prepare(\"%s\") failed", sql)));
 	if ((portal = SPI_cursor_open(NULL, plan, NULL, NULL, true)) == NULL)
@@ -939,15 +941,32 @@ load_table_size(StringInfoData *active_oids)
 	}
 
 	tupdesc = SPI_tuptable->tupdesc;
-
-	ereportif(SPI_gettypeid(tupdesc, 1) != OIDOID, ERROR,
-	          (errcode(ERRCODE_MOST_SPECIFIC_TYPE_MISMATCH), errmsg("type of column \"tableid\" must be \"OID\"")));
-	ereportif(SPI_gettypeid(tupdesc, 2) != INT8OID, ERROR,
-	          (errcode(ERRCODE_MOST_SPECIFIC_TYPE_MISMATCH), errmsg("type of column \"size\" must be \"INT8\"")));
-	ereportif(SPI_gettypeid(tupdesc, 3) != INT2OID, ERROR,
-	          (errcode(ERRCODE_MOST_SPECIFIC_TYPE_MISMATCH), errmsg("type of column \"segid\" must be \"INT2\"")));
-
-	Assert(active_oids->len == 0);
+#if GP_VERSION_NUM < 70000
+	if (tupdesc->natts != 3 || ((tupdesc)->attrs[0])->atttypid != OIDOID ||
+	    ((tupdesc)->attrs[1])->atttypid != INT8OID || ((tupdesc)->attrs[2])->atttypid != INT2OID)
+#else
+	if (tupdesc->natts != 3 || ((tupdesc)->attrs[0]).atttypid != OIDOID || ((tupdesc)->attrs[1]).atttypid != INT8OID ||
+	    ((tupdesc)->attrs[2]).atttypid != INT2OID)
+#endif /* GP_VERSION_NUM */
+	{
+		if (tupdesc->natts != 3)
+		{
+			ereport(WARNING, (errmsg("[diskquota] tupdesc->natts: %d", tupdesc->natts)));
+		}
+		else
+		{
+#if GP_VERSION_NUM < 70000
+			ereport(WARNING, (errmsg("[diskquota] attrs: %d, %d, %d", tupdesc->attrs[0]->atttypid,
+			                         tupdesc->attrs[1]->atttypid, tupdesc->attrs[2]->atttypid)));
+#else
+			ereport(WARNING, (errmsg("[diskquota] attrs: %d, %d, %d", tupdesc->attrs[0].atttypid,
+			                         tupdesc->attrs[1].atttypid, tupdesc->attrs[2].atttypid)));
+#endif /* GP_VERSION_NUM */
+		}
+		ereport(ERROR, (errmsg("[diskquota] table \"table_size\" is corrupted in database \"%s\","
+		                       " please recreate diskquota extension",
+		                       get_database_name(MyDatabaseId))));
+	}
 
 	while (SPI_processed > 0)
 	{
