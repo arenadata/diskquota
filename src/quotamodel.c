@@ -220,7 +220,7 @@ static void transfer_table_for_quota(int64 totalsize, QuotaType type, Oid *old_k
 
 /* functions to refresh disk quota model*/
 static void refresh_disk_quota_usage(bool is_init);
-static void calculate_schema_and_role_disk_usage(bool is_init);
+static void track_namespace_owner_tablespace_changes(bool is_init);
 static void flush_to_table_size(void);
 static bool flush_local_reject_map(void);
 static void dispatch_rejectmap(const char *active_oids);
@@ -832,8 +832,8 @@ refresh_disk_quota_usage(bool is_init)
 		gp_fetch_active_tables(is_init, &active_oids);
 		bool hasActiveTable = (active_oids.len > 0);
 		/* TODO: if we can skip the following steps when there is no active table */
-		/* recalculate the disk usage of schema and role */
-		calculate_schema_and_role_disk_usage(is_init);
+		/* Recalculate the namespace, owner and tablespace disk usage */
+		track_namespace_owner_tablespace_changes(is_init);
 		/* refresh quota_info_map */
 		refresh_quota_info_map();
 		/* flush local table_size_map to user table table_size */
@@ -969,16 +969,15 @@ calculate_active_table_disk_usage(Oid oid, int64 size, int16 segid)
 }
 
 /*
- *  Recalculate the schema and role disk usage.
+ *  Recalculate the namespace, owner and tablespace disk usage.
  *  Detect the removed table if it's no longer in pg_class.
- *  If change happens, no matter size change or owner change,
- *  update namespace_size_map and role_size_map correspondingly.
- *  Parameter 'is_init' set to true at initialization stage to fetch tables
- *  size from table table_size
+ *  If change happens, no matter size change or namespace change or
+ *  owner change or tablespace change, update quota_info_map.
+ *  Parameter 'is_init' set to true at initialization stage.
  */
 
 static void
-calculate_schema_and_role_disk_usage(bool is_init)
+track_namespace_owner_tablespace_changes(bool is_init)
 {
 	TableSizeEntry *tsentry = NULL;
 	Oid             relOid;
@@ -998,8 +997,7 @@ calculate_schema_and_role_disk_usage(bool is_init)
 
 	/*
 	 * scan pg_class to detect table event: drop, reset schema, reset owner.
-	 * calculate the file size for active table and update namespace_size_map
-	 * and role_size_map
+	 * calculate the file size for active table and update quota_info_map
 	 */
 	oidlist = get_rel_oid_list();
 
