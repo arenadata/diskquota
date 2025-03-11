@@ -1475,6 +1475,7 @@ do_load_quotas(void)
 		                       get_database_name(MyDatabaseId))));
 	}
 
+	bool cleanConfigTables = false;
 	for (i = 0; i < SPI_processed; i++)
 	{
 		HeapTuple tup = SPI_tuptable->vals[i];
@@ -1503,6 +1504,22 @@ do_load_quotas(void)
 			targetOid = primaryOid;
 		}
 
+		int cacheid = AUTHOID;
+		switch (quotaType)
+		{
+			case NAMESPACE_QUOTA:
+			case NAMESPACE_TABLESPACE_QUOTA:
+				cacheid = NAMESPACEOID;
+				/* fallthrough */
+			case ROLE_QUOTA:
+			case ROLE_TABLESPACE_QUOTA:
+				if (!SearchSysCacheExists1(cacheid, ObjectIdGetDatum(targetOid)))
+				{
+					cleanConfigTables = true;
+					continue;
+				}
+		}
+
 		if (spcOid == InvalidOid)
 		{
 			if (quotaType == NAMESPACE_TABLESPACE_QUOTA || quotaType == ROLE_TABLESPACE_QUOTA)
@@ -1515,8 +1532,29 @@ do_load_quotas(void)
 		}
 		else
 		{
-			update_limit_for_quota(quota_limit_mb * (1 << 20), segratio, quotaType, (Oid[]){targetOid, spcOid});
+			if (SearchSysCacheExists1(TABLESPACEOID, ObjectIdGetDatum(spcOid)))
+				update_limit_for_quota(quota_limit_mb * (1 << 20), segratio, quotaType, (Oid[]){targetOid, spcOid});
+			else
+				cleanConfigTables = true;
 		}
+	}
+
+	if (cleanConfigTables)
+	{
+		SPI_execute(
+		        "delete from diskquota.target"
+		        " where (quotaType = 2 and primaryOid not in (select oid from pg_namespace))"
+		        "    or (quotaType = 3 and primaryOid not in (select oid from pg_roles))"
+		        "    or tablespaceOid not in (select oid from pg_tablespace)",
+		        false, 0);
+		SPI_execute(
+		        "delete from diskquota.quota_config"
+		        " where (quotaType = 0 and targetOid not in (select oid from pg_namespace))"
+		        "    or (quotaType = 1 and targetOid not in (select oid from pg_roles))"
+		        "    or (quotaType = 4 and targetOid not in (select oid from pg_tablespace))"
+		        "    or (quotaType in (2, 3) and (targetOid, quotaType) not in (select rowId, quotaType from "
+		        "diskquota.target))",
+		        false, 0);
 	}
 
 	SPI_finish_if(connected_in_this_function);
