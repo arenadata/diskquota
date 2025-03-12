@@ -8,7 +8,7 @@ DROP TABLESPACE IF EXISTS ts1;
 DROP TABLESPACE IF EXISTS ts2;
 DROP TABLESPACE IF EXISTS ts3;
 -- end_ignore
-\! rm -rf /tmp/ts{1,2,3}
+\! rm -rf /tmp/ts1 /tmp/ts2 /tmp/ts3
 TRUNCATE TABLE diskquota.target;
 TRUNCATE TABLE diskquota.quota_config;
 
@@ -49,7 +49,9 @@ WHERE c.quotatype = 1;
 
 -- TABLESPACE_QUOTA
 
-\! mkdir -p /tmp/ts{1,2,3}
+\! mkdir -p /tmp/ts1
+\! mkdir -p /tmp/ts2
+\! mkdir -p /tmp/ts3
 CREATE TABLESPACE ts1 LOCATION '/tmp/ts1';
 CREATE TABLESPACE ts2 LOCATION '/tmp/ts2';
 CREATE TABLESPACE ts3 LOCATION '/tmp/ts3';
@@ -140,4 +142,4 @@ TRUNCATE TABLE diskquota.quota_config;
 DROP SCHEMA s3;
 DROP ROLE r3;
 DROP TABLESPACE ts1;
-\! rm -rf /tmp/ts{1,2,3}
+\! rm -rf /tmp/ts1 /tmp/ts2 /tmp/ts3

@@ -1,6 +1,6 @@
 -- Test auto cleaning of configuration tables (diskquota.quota_config and
 -- diskquota.target) when schema, tablespace or role is dropped.
-\! rm -rf /tmp/ts{1,2,3}
+\! rm -rf /tmp/ts1 /tmp/ts2 /tmp/ts3
 TRUNCATE TABLE diskquota.target;
 TRUNCATE TABLE diskquota.quota_config;
 -- NAMESPACE_QUOTA
@@ -55,7 +55,9 @@ WHERE c.quotatype = 1;
 (2 rows)
 
 -- TABLESPACE_QUOTA
-\! mkdir -p /tmp/ts{1,2,3}
+\! mkdir -p /tmp/ts1
+\! mkdir -p /tmp/ts2
+\! mkdir -p /tmp/ts3
 CREATE TABLESPACE ts1 LOCATION '/tmp/ts1';
 CREATE TABLESPACE ts2 LOCATION '/tmp/ts2';
 CREATE TABLESPACE ts3 LOCATION '/tmp/ts3';
@@ -201,4 +203,4 @@ TRUNCATE TABLE diskquota.quota_config;
 DROP SCHEMA s3;
 DROP ROLE r3;
 DROP TABLESPACE ts1;
-\! rm -rf /tmp/ts{1,2,3}
+\! rm -rf /tmp/ts1 /tmp/ts2 /tmp/ts3
