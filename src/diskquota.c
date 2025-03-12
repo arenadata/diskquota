@@ -834,9 +834,6 @@ disk_quota_launcher_main(Datum main_arg)
 			}
 		}
 
-		bool sigusr1 = false;
-		bool sigusr2 = false;
-
 		/*
 		 * background workers mustn't call usleep() or any direct equivalent:
 		 * instead, they may wait on their process latch, which sleeps as
@@ -864,7 +861,6 @@ disk_quota_launcher_main(Datum main_arg)
 			elog(DEBUG1, "[diskquota] got sigusr2");
 			got_sigusr2 = false;
 			process_extension_ddl_message();
-			sigusr2 = true;
 		}
 
 		/* in case of a SIGHUP, just reload the configuration. */
@@ -884,7 +880,6 @@ disk_quota_launcher_main(Datum main_arg)
 		{
 			elog(DEBUG1, "[diskquota] got sigusr1");
 			got_sigusr1 = false;
-			sigusr1     = true;
 		}
 
 		/*
