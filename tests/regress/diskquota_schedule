@@ -22,6 +22,7 @@ test: test_ctas_before_set_quota
 test: test_truncate
 test: test_delete_quota
 test: test_partition
+test: test_plpgsql
 test: test_vacuum
 test: test_primary_failure
 test: test_extension
