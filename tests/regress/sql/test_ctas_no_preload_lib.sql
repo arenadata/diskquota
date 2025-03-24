@@ -1,4 +1,4 @@
-\! gpconfig -c shared_preload_libraries -v '' > /dev/null 
+\! gpconfig -c shared_preload_libraries -v "$(psql -At -c "SELECT regexp_replace(current_setting('shared_preload_libraries'), '(,{0,1})diskquota(.*)\.so', '')" postgres)" > /dev/null
 \! gpstop -far > /dev/null
 \c
 
@@ -10,7 +10,7 @@ SET ROLE test;
 CREATE TABLE t_without_diskquota (i) AS SELECT generate_series(1, 100000)
 DISTRIBUTED BY (i);
 
-\! gpconfig -c shared_preload_libraries -v $(./data/current_binary_name) > /dev/null
+\! gpconfig -c shared_preload_libraries -v "$(psql -At -c "SELECT array_to_string(array_append(string_to_array(current_setting('shared_preload_libraries'), ','), '$(./data/current_binary_name)'), ',')" postgres)" > /dev/null
 \! gpstop -far > /dev/null
 \c
 

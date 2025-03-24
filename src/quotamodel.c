@@ -220,10 +220,10 @@ static void transfer_table_for_quota(int64 totalsize, QuotaType type, Oid *old_k
 
 /* functions to refresh disk quota model*/
 static void refresh_disk_quota_usage(bool is_init);
-static void calculate_table_disk_usage(bool is_init, HTAB *local_active_table_stat_map);
+static void track_namespace_owner_tablespace_changes(bool is_init);
 static void flush_to_table_size(void);
 static bool flush_local_reject_map(void);
-static void dispatch_rejectmap(HTAB *local_active_table_stat_map);
+static void dispatch_rejectmap(const char *active_oids);
 static bool load_quotas(void);
 static void do_load_quotas(void);
 
@@ -251,9 +251,6 @@ typedef struct
 	ArrayBuildState *sizes;
 	ArrayBuildState *segids;
 } UpdateArrays;
-
-static void delete_from_table_size_map(DeleteArrays *arrays);
-static void update_table_size_map(UpdateArrays *arrays);
 
 /* add a new entry quota or update the old entry quota */
 static void
@@ -809,11 +806,12 @@ refresh_disk_quota_model(bool is_init)
 static void
 refresh_disk_quota_usage(bool is_init)
 {
-	volatile bool pushed_active_snap           = false;
-	volatile bool ret                          = true;
-	HTAB *volatile local_active_table_stat_map = NULL;
+	volatile bool  pushed_active_snap = false;
+	volatile bool  ret                = true;
+	StringInfoData active_oids;
 
 	StartTransactionCommand();
+	initStringInfo(&active_oids);
 
 	/*
 	 * Cache Errors during SPI functions, for example a segment may be down
@@ -828,14 +826,14 @@ refresh_disk_quota_usage(bool is_init)
 		 * initialization stage all the tables are active. later loop, only the
 		 * tables whose disk size changed will be treated as active
 		 *
-		 * local_active_table_stat_map only contains the active tables which belong
+		 * active_oids only contains the active tables which belong
 		 * to the current database.
 		 */
-		local_active_table_stat_map = gp_fetch_active_tables(is_init);
-		bool hasActiveTable         = (hash_get_num_entries(local_active_table_stat_map) != 0);
+		gp_fetch_active_tables(is_init, &active_oids);
+		bool hasActiveTable = (active_oids.len > 0);
 		/* TODO: if we can skip the following steps when there is no active table */
-		/* recalculate the disk usage of table, schema and role */
-		calculate_table_disk_usage(is_init, local_active_table_stat_map);
+		/* Recalculate the namespace, owner and tablespace disk usage */
+		track_namespace_owner_tablespace_changes(is_init);
 		/* refresh quota_info_map */
 		refresh_quota_info_map();
 		/* flush local table_size_map to user table table_size */
@@ -849,7 +847,7 @@ refresh_disk_quota_usage(bool is_init)
 		 * not empty the rejectmap should be dispatched to segments.
 		 */
 		if (is_init || (diskquota_hardlimit && (reject_map_changed || hasActiveTable)))
-			dispatch_rejectmap(local_active_table_stat_map);
+			dispatch_rejectmap(active_oids.data);
 	}
 	PG_CATCH();
 	{
@@ -862,7 +860,7 @@ refresh_disk_quota_usage(bool is_init)
 		RESUME_INTERRUPTS();
 	}
 	PG_END_TRY();
-	if (local_active_table_stat_map) hash_destroy(local_active_table_stat_map);
+	if (active_oids.data) pfree(active_oids.data);
 	if (pushed_active_snap) PopActiveSnapshot();
 	if (ret)
 		CommitTransactionCommand();
@@ -900,30 +898,92 @@ merge_uncommitted_table_to_oidlist(List *oidlist)
 	return oidlist;
 }
 
+static TableSizeEntry *
+get_table_size_map_entry(Oid oid, int16 segid)
+{
+	bool              found;
+	TableSizeEntryKey key     = {.reloid = oid, .id = TableSizeEntryId(segid)};
+	HASHACTION        action  = check_hash_fullness(table_size_map, MAX_NUM_TABLE_SIZE_ENTRIES, table_size_map_warning,
+	                                                table_size_map_last_overflow_report);
+	TableSizeEntry   *tsentry = hash_search(table_size_map, &key, action, &found);
+
+	if (!found && tsentry != NULL)
+	{
+		memset(tsentry->totalsize, 0, sizeof(tsentry->totalsize));
+		tsentry->owneroid      = InvalidOid;
+		tsentry->namespaceoid  = InvalidOid;
+		tsentry->tablespaceoid = InvalidOid;
+		tsentry->flag          = 0;
+
+		int seg_st = TableSizeEntrySegidStart(tsentry);
+		int seg_ed = TableSizeEntrySegidEnd(tsentry);
+		for (int j = seg_st; j < seg_ed; j++) TableSizeEntrySetFlushFlag(tsentry, j);
+	}
+
+	return tsentry;
+}
+
 /*
- *  Incremental way to update the disk quota of every database objects
- *  Recalculate the table's disk usage when it's a new table or active table.
+ *  Incremental way to update the disk quota of every active tables.
+ *  Recalculate the table's disk usage when it's an active table.
+ */
+void
+calculate_active_table_disk_usage(Oid oid, int64 size, int16 segid)
+{
+	TableSizeEntry *tsentry = get_table_size_map_entry(oid, segid);
+
+	if (tsentry == NULL)
+	{
+		/* Too many tables have been added to the table_size_map, to avoid diskquota using
+		   too much share memory, just return. The diskquota won't work correctly
+		   anymore. */
+		return;
+	}
+
+	if (segid == -1)
+	{
+		/* pretend process as utility mode, and append the table size on master */
+		Gp_role = GP_ROLE_UTILITY;
+
+		/* when segid is -1, the size is the sum of size of master and all segments */
+		size += calculate_table_size(oid);
+
+		Gp_role = GP_ROLE_DISPATCH;
+	}
+
+	/* firstly calculate the updated total size of a table */
+	int64 updated_total_size = size - TableSizeEntryGetSize(tsentry, segid);
+
+	/* update the table_size entry */
+	TableSizeEntrySetSize(tsentry, segid, size);
+	TableSizeEntrySetFlushFlag(tsentry, segid);
+
+	/* update the disk usage, there may be entries in the map whose keys are InvlidOid as the tsentry does
+	 * not exist in the table_size_map */
+	update_size_for_quota(updated_total_size, NAMESPACE_QUOTA, (Oid[]){tsentry->namespaceoid}, segid);
+	update_size_for_quota(updated_total_size, ROLE_QUOTA, (Oid[]){tsentry->owneroid}, segid);
+	update_size_for_quota(updated_total_size, ROLE_TABLESPACE_QUOTA, (Oid[]){tsentry->owneroid, tsentry->tablespaceoid},
+	                      segid);
+	update_size_for_quota(updated_total_size, NAMESPACE_TABLESPACE_QUOTA,
+	                      (Oid[]){tsentry->namespaceoid, tsentry->tablespaceoid}, segid);
+}
+
+/*
+ *  Recalculate the namespace, owner and tablespace disk usage.
  *  Detect the removed table if it's no longer in pg_class.
- *  If change happens, no matter size change or owner change,
- *  update namespace_size_map and role_size_map correspondingly.
- *  Parameter 'is_init' set to true at initialization stage to fetch tables
- *  size from table table_size
+ *  If change happens, no matter size change or namespace change or
+ *  owner change or tablespace change, update quota_info_map.
+ *  Parameter 'is_init' set to true at initialization stage.
  */
 
 static void
-calculate_table_disk_usage(bool is_init, HTAB *local_active_table_stat_map)
+track_namespace_owner_tablespace_changes(bool is_init)
 {
-	bool                      table_size_map_found;
-	bool                      active_tbl_found;
-	int64                     updated_total_size;
-	TableSizeEntry           *tsentry = NULL;
-	Oid                       relOid;
-	HASH_SEQ_STATUS           iter;
-	ActiveTableEntryCombined *active_table_entry;
-	TableSizeEntryKey         key;
-	List                     *oidlist;
-	ListCell                 *l;
-	DeleteArrays delete = {0};
+	TableSizeEntry *tsentry = NULL;
+	Oid             relOid;
+	HASH_SEQ_STATUS iter;
+	List           *oidlist;
+	ListCell       *l;
 
 	/*
 	 * unset is_exist flag for tsentry in table_size_map this is used to
@@ -937,10 +997,9 @@ calculate_table_disk_usage(bool is_init, HTAB *local_active_table_stat_map)
 
 	/*
 	 * scan pg_class to detect table event: drop, reset schema, reset owner.
-	 * calculate the file size for active table and update namespace_size_map
-	 * and role_size_map
+	 * calculate the file size for active table and update quota_info_map
 	 */
-	oidlist = get_rel_oid_list(is_init);
+	oidlist = get_rel_oid_list();
 
 	oidlist = merge_uncommitted_table_to_oidlist(oidlist);
 
@@ -975,21 +1034,6 @@ calculate_table_disk_usage(bool is_init, HTAB *local_active_table_stat_map)
 				elog(WARNING, "cache lookup failed for relation %u", relOid);
 				LWLockRelease(diskquota_locks.relation_cache_lock);
 
-				if (!is_init) continue;
-
-				for (int i = -1; i < SEGCOUNT; i++)
-				{
-					delete.tableids = accumArrayResult(delete.tableids, ObjectIdGetDatum(relOid), false, OIDOID,
-					                                   CurrentMemoryContext);
-					delete.segids =
-					        accumArrayResult(delete.segids, Int16GetDatum(i), false, INT2OID, CurrentMemoryContext);
-
-					if (delete.tableids->nelems > SQL_MAX_VALUES_NUMBER)
-					{
-						delete_from_table_size_map(&delete);
-					}
-				}
-
 				continue;
 			}
 			relnamespace  = relation_entry->namespaceoid;
@@ -1005,72 +1049,19 @@ calculate_table_disk_usage(bool is_init, HTAB *local_active_table_stat_map)
 		 */
 		for (int cur_segid = -1; cur_segid < SEGCOUNT; cur_segid++)
 		{
-			key.reloid = relOid;
-			key.id     = TableSizeEntryId(cur_segid);
+			tsentry = get_table_size_map_entry(relOid, cur_segid);
 
-			HASHACTION action = check_hash_fullness(table_size_map, MAX_NUM_TABLE_SIZE_ENTRIES, table_size_map_warning,
-			                                        table_size_map_last_overflow_report);
-			tsentry           = hash_search(table_size_map, &key, action, &table_size_map_found);
-
-			if (!table_size_map_found)
+			if (tsentry == NULL)
 			{
-				if (tsentry == NULL)
-				{
-					/* Too many tables have been added to the table_size_map, to avoid diskquota using
-					   too much share memory, just quit the loop. The diskquota won't work correctly
-					   anymore. */
-					break;
-				}
-
-				tsentry->key.reloid = relOid;
-				tsentry->key.id     = key.id;
-				Assert(TableSizeEntrySegidStart(tsentry) == cur_segid);
-				memset(tsentry->totalsize, 0, sizeof(tsentry->totalsize));
-				tsentry->owneroid      = InvalidOid;
-				tsentry->namespaceoid  = InvalidOid;
-				tsentry->tablespaceoid = InvalidOid;
-				tsentry->flag          = 0;
-
-				int seg_st = TableSizeEntrySegidStart(tsentry);
-				int seg_ed = TableSizeEntrySegidEnd(tsentry);
-				for (int j = seg_st; j < seg_ed; j++) TableSizeEntrySetFlushFlag(tsentry, j);
+				/* Too many tables have been added to the table_size_map, to avoid diskquota using
+				   too much share memory, just quit the loop. The diskquota won't work correctly
+				   anymore. */
+				break;
 			}
 
 			/* mark tsentry is_exist */
 			if (tsentry) set_table_size_entry_flag(tsentry, TABLE_EXIST);
-			active_table_entry = (ActiveTableEntryCombined *)hash_search(local_active_table_stat_map, &relOid,
-			                                                             HASH_FIND, &active_tbl_found);
 
-			/* skip to recalculate the tables which are not in active list */
-			if (active_tbl_found)
-			{
-				if (cur_segid == -1)
-				{
-					/* pretend process as utility mode, and append the table size on master */
-					Gp_role = GP_ROLE_UTILITY;
-
-					/* when cur_segid is -1, the tablesize is the sum of tablesize of master and all segments */
-					active_table_entry->tablesize[0] += calculate_table_size(relOid);
-
-					Gp_role = GP_ROLE_DISPATCH;
-				}
-				/* firstly calculate the updated total size of a table */
-				updated_total_size =
-				        active_table_entry->tablesize[cur_segid + 1] - TableSizeEntryGetSize(tsentry, cur_segid);
-
-				/* update the table_size entry */
-				TableSizeEntrySetSize(tsentry, cur_segid, active_table_entry->tablesize[cur_segid + 1]);
-				TableSizeEntrySetFlushFlag(tsentry, cur_segid);
-
-				/* update the disk usage, there may be entries in the map whose keys are InvlidOid as the tsentry does
-				 * not exist in the table_size_map */
-				update_size_for_quota(updated_total_size, NAMESPACE_QUOTA, (Oid[]){tsentry->namespaceoid}, cur_segid);
-				update_size_for_quota(updated_total_size, ROLE_QUOTA, (Oid[]){tsentry->owneroid}, cur_segid);
-				update_size_for_quota(updated_total_size, ROLE_TABLESPACE_QUOTA,
-				                      (Oid[]){tsentry->owneroid, tsentry->tablespaceoid}, cur_segid);
-				update_size_for_quota(updated_total_size, NAMESPACE_TABLESPACE_QUOTA,
-				                      (Oid[]){tsentry->namespaceoid, tsentry->tablespaceoid}, cur_segid);
-			}
 			/* table size info doesn't need to flush at init quota model stage */
 			if (is_init)
 			{
@@ -1114,11 +1105,6 @@ calculate_table_disk_usage(bool is_init, HTAB *local_active_table_stat_map)
 		{
 			heap_freetuple(classTup);
 		}
-	}
-
-	if (delete.tableids)
-	{
-		delete_from_table_size_map(&delete);
 	}
 
 	list_free(oidlist);
@@ -1344,53 +1330,36 @@ flush_local_reject_map(void)
  * Dispatch rejectmap to segment servers.
  */
 static void
-dispatch_rejectmap(HTAB *local_active_table_stat_map)
+dispatch_rejectmap(const char *active_oids)
 {
-	HASH_SEQ_STATUS           hash_seq;
-	GlobalRejectMapEntry     *rejectmap_entry;
-	ActiveTableEntryCombined *active_table_entry;
-	int                       num_entries, count = 0;
-	CdbPgResults              cdb_pgresults = {NULL, 0};
-	StringInfoData            rows;
-	StringInfoData            active_oids;
-	StringInfoData            sql;
+	HASH_SEQ_STATUS       hash_seq;
+	GlobalRejectMapEntry *rejectmap_entry;
+	CdbPgResults          cdb_pgresults = {NULL, 0};
+	StringInfoData        rows;
+	StringInfoData        sql;
 
 	initStringInfo(&rows);
-	initStringInfo(&active_oids);
 	initStringInfo(&sql);
 
 	LWLockAcquire(diskquota_locks.reject_map_lock, LW_SHARED);
-	num_entries = hash_get_num_entries(disk_quota_reject_map);
 	hash_seq_init(&hash_seq, disk_quota_reject_map);
 	while ((rejectmap_entry = hash_seq_search(&hash_seq)) != NULL)
 	{
+		if (rows.len > 0) appendStringInfoString(&rows, ",");
 		appendStringInfo(&rows, "ROW(%d, %d, %d, %d, %s)", rejectmap_entry->keyitem.targetoid,
 		                 rejectmap_entry->keyitem.databaseoid, rejectmap_entry->keyitem.tablespaceoid,
 		                 rejectmap_entry->keyitem.targettype, rejectmap_entry->segexceeded ? "true" : "false");
-
-		if (++count != num_entries) appendStringInfo(&rows, ",");
 	}
 	LWLockRelease(diskquota_locks.reject_map_lock);
-
-	count       = 0;
-	num_entries = hash_get_num_entries(local_active_table_stat_map);
-	hash_seq_init(&hash_seq, local_active_table_stat_map);
-	while ((active_table_entry = hash_seq_search(&hash_seq)) != NULL)
-	{
-		appendStringInfo(&active_oids, "%d", active_table_entry->reloid);
-
-		if (++count != num_entries) appendStringInfo(&active_oids, ",");
-	}
 
 	appendStringInfo(&sql,
 	                 "select diskquota.refresh_rejectmap("
 	                 "ARRAY[%s]::diskquota.rejectmap_entry[], "
 	                 "ARRAY[%s]::oid[])",
-	                 rows.data, active_oids.data);
+	                 rows.data, active_oids);
 	CdbDispatchCommand(sql.data, DF_NONE, &cdb_pgresults);
 
 	pfree(rows.data);
-	pfree(active_oids.data);
 	pfree(sql.data);
 	cdbdisp_clearCdbPgResults(&cdb_pgresults);
 }

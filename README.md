@@ -120,7 +120,7 @@ create database diskquota;
 3. Enable diskquota as preload library 
 ```
 # enable diskquota in preload library.
-gpconfig -c shared_preload_libraries -v 'diskquota-<major.minor>'
+gpconfig -c shared_preload_libraries -v "$(psql -At -c "SELECT array_to_string(array_append(string_to_array(current_setting('shared_preload_libraries'), ','), 'diskquota-<major.minor>'), ',')" postgres)"
 # restart database.
 gpstop -ar
 ```

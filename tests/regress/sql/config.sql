@@ -1,7 +1,7 @@
 --start_ignore
 CREATE DATABASE diskquota;
 
-\! gpconfig -c shared_preload_libraries -v $(./data/current_binary_name);
+\! gpconfig -c shared_preload_libraries -v "$(psql -At -c "SELECT array_to_string(array_append(string_to_array(regexp_replace(current_setting('shared_preload_libraries'), '(,{0,1})diskquota(.*)\.so', ''), ','), '$(./data/current_binary_name)'), ',')" postgres)";
 \! gpconfig -c diskquota.naptime -v 0 --skipvalidation
 \! gpconfig -c max_worker_processes -v 20 --skipvalidation
 \! gpconfig -c diskquota.hard_limit -v "off" --skipvalidation

@@ -39,18 +39,15 @@ typedef struct DiskQuotaActiveTableEntry
 
 typedef struct ActiveTableEntryCombined
 {
-	Oid reloid;
-	/*
-	 Variable length array: index 0 is used for the coordinator,
-	 the remaining SEGCOUNT indexes are for segments.
-	 */
-	Size tablesize[1];
+	Oid  reloid;
+	Size tablesize;
 } ActiveTableEntryCombined;
 
-extern HTAB *gp_fetch_active_tables(bool force);
-extern void  init_active_table_hook(void);
-extern void  init_shm_worker_active_tables(void);
-extern void  init_lock_active_tables(void);
+extern void gp_fetch_active_tables(bool is_init, StringInfoData *active_oids);
+extern void init_active_table_hook(void);
+extern void init_shm_worker_active_tables(void);
+extern void init_lock_active_tables(void);
+extern void calculate_active_table_disk_usage(Oid oid, int64 size, int16 segid);
 
 extern HTAB *monitored_dbid_cache;
 
