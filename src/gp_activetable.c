@@ -923,8 +923,8 @@ load_table_size(StringInfoData *active_oids)
 	int        i;
 	SPIPlanPtr plan;
 	Portal     portal;
-	char      *sql                        = "select tableid, size, segid from diskquota.table_size";
-	bool       connected_in_this_function = SPI_connect_if_not_yet();
+	char      *sql    = "select tableid, size, segid from diskquota.table_size";
+	bool       pushed = SPI_push_cond_and_connect();
 
 	Assert(active_oids->len == 0);
 
@@ -1007,7 +1007,7 @@ load_table_size(StringInfoData *active_oids)
 	SPI_freetuptable(SPI_tuptable);
 	SPI_cursor_close(portal);
 	SPI_freeplan(plan);
-	SPI_finish_if(connected_in_this_function);
+	SPI_finish_and_pop_cond(pushed);
 }
 
 /*
