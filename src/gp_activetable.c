@@ -924,10 +924,10 @@ load_table_size(StringInfoData *active_oids)
 	SPIPlanPtr plan;
 	Portal     portal;
 	char      *sql                        = "select tableid, size, segid from diskquota.table_size";
-	bool       connected_in_this_function = SPI_connect_if_not_yet();
 
 	Assert(active_oids->len == 0);
 
+	SPI_connect_and_check();
 	if ((plan = SPI_prepare(sql, 0, NULL)) == NULL)
 		ereport(ERROR, (errmsg("[diskquota] SPI_prepare(\"%s\") failed", sql)));
 	if ((portal = SPI_cursor_open(NULL, plan, NULL, NULL, true)) == NULL)
@@ -1007,7 +1007,7 @@ load_table_size(StringInfoData *active_oids)
 	SPI_freetuptable(SPI_tuptable);
 	SPI_cursor_close(portal);
 	SPI_freeplan(plan);
-	SPI_finish_if(connected_in_this_function);
+	SPI_finish_and_check();
 }
 
 /*
