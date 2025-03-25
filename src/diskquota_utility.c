@@ -1276,7 +1276,7 @@ out:
 List *
 get_rel_oid_list(void)
 {
-	List *oidlist                    = NIL;
+	List *oidlist = NIL;
 	int   ret;
 
 	SPI_connect_and_check();

@@ -737,7 +737,7 @@ do_check_diskquota_state_is_ready(void)
 	TupleDesc tupdesc;
 
 	SPI_connect_and_check();
-	ret                                  = SPI_execute("select state from diskquota.state", true, 0);
+	ret = SPI_execute("select state from diskquota.state", true, 0);
 	ereportif(ret != SPI_OK_SELECT, ERROR,
 	          (errcode(ERRCODE_INTERNAL_ERROR),
 	           errmsg("[diskquota] check diskquota state SPI_execute failed: error code %d", ret)));
@@ -1138,13 +1138,13 @@ track_namespace_owner_tablespace_changes(bool is_init)
 static void
 delete_from_table_size_map(DeleteArrays *arrays)
 {
-	Datum tableid                    = makeArrayResult(arrays->tableids, CurrentMemoryContext);
-	Datum segid                      = makeArrayResult(arrays->segids, CurrentMemoryContext);
+	Datum tableid = makeArrayResult(arrays->tableids, CurrentMemoryContext);
+	Datum segid   = makeArrayResult(arrays->segids, CurrentMemoryContext);
 
 	SPI_connect_and_check();
-	int   ret                        = SPI_execute_with_args(
-	                                 "delete from diskquota.table_size where (tableid, segid) in (select * from unnest($1, $2))", 2,
-	                                 (Oid[]){OIDARRAYOID, INT2ARRAYOID}, (Datum[]){tableid, segid}, NULL, false, 0);
+	int ret = SPI_execute_with_args(
+	        "delete from diskquota.table_size where (tableid, segid) in (select * from unnest($1, $2))", 2,
+	        (Oid[]){OIDARRAYOID, INT2ARRAYOID}, (Datum[]){tableid, segid}, NULL, false, 0);
 	ereportif(ret != SPI_OK_DELETE, ERROR,
 	          (errcode(ERRCODE_INTERNAL_ERROR),
 	           errmsg("[diskquota] delete_from_table_size_map SPI_execute failed: error code %d", ret)));
@@ -1158,13 +1158,13 @@ delete_from_table_size_map(DeleteArrays *arrays)
 static void
 update_table_size_map(UpdateArrays *arrays)
 {
-	Datum tableid                    = makeArrayResult(arrays->tableids, CurrentMemoryContext);
-	Datum size                       = makeArrayResult(arrays->sizes, CurrentMemoryContext);
-	Datum segid                      = makeArrayResult(arrays->segids, CurrentMemoryContext);
+	Datum tableid = makeArrayResult(arrays->tableids, CurrentMemoryContext);
+	Datum size    = makeArrayResult(arrays->sizes, CurrentMemoryContext);
+	Datum segid   = makeArrayResult(arrays->segids, CurrentMemoryContext);
 	SPI_connect_and_check();
-	int   ret                        = SPI_execute_with_args(
-	                                 "delete from diskquota.table_size where (tableid, segid) in (select * from unnest($1, $2))", 2,
-	                                 (Oid[]){OIDARRAYOID, INT2ARRAYOID}, (Datum[]){tableid, segid}, NULL, false, 0);
+	int ret = SPI_execute_with_args(
+	        "delete from diskquota.table_size where (tableid, segid) in (select * from unnest($1, $2))", 2,
+	        (Oid[]){OIDARRAYOID, INT2ARRAYOID}, (Datum[]){tableid, segid}, NULL, false, 0);
 	ereportif(ret != SPI_OK_DELETE, ERROR,
 	          (errcode(ERRCODE_INTERNAL_ERROR),
 	           errmsg("[diskquota] delete_from_table_size_map SPI_execute failed: error code %d", ret)));
@@ -2267,7 +2267,7 @@ update_monitor_db_mpp(Oid dbid, FetchTableStatType action, const char *schema)
 	                 action, dbid);
 	/* Add current database to the monitored db cache on all segments */
 	SPI_connect_and_check();
-	int  ret                        = SPI_execute(sql_command.data, true, 0);
+	int ret = SPI_execute(sql_command.data, true, 0);
 	SPI_finish_and_check();
 	pfree(sql_command.data);
 
