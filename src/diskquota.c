@@ -176,7 +176,7 @@ static bool
 is_altering_extension_to_default_version(char *version)
 {
 	int  spi_ret;
-	bool ret = false;
+	bool ret                        = false;
 	SPI_connect_and_check();
 	spi_ret = SPI_execute("select default_version from pg_available_extensions where name ='diskquota'", true, 0);
 	if (spi_ret != SPI_OK_SELECT)
@@ -954,8 +954,8 @@ static void
 create_monitor_db_table(void)
 {
 	const char   *sql;
-	volatile bool pushed_active_snap = false;
-	volatile bool ret                = true;
+	volatile bool pushed_active_snap         = false;
+	volatile bool ret                        = true;
 
 	/*
 	 * Create function diskquota.diskquota_fetch_table_stat in launcher
@@ -1043,7 +1043,7 @@ init_database_list(void)
 	PushActiveSnapshot(GetTransactionSnapshot());
 
 	SPI_connect_and_check();
-	ret = SPI_execute("select dbid from diskquota_namespace.database_list;", true, 0);
+	ret                             = SPI_execute("select dbid from diskquota_namespace.database_list;", true, 0);
 	if (ret != SPI_OK_SELECT)
 	{
 		int saved_errno = errno;
@@ -1338,8 +1338,8 @@ add_dbid_to_database_list(Oid dbid)
 {
 	int ret;
 
-	Oid   argt[1] = {OIDOID};
-	Datum argv[1] = {ObjectIdGetDatum(dbid)};
+	Oid   argt[1]                    = {OIDOID};
+	Datum argv[1]                    = {ObjectIdGetDatum(dbid)};
 
 	SPI_connect_and_check();
 	ret = SPI_execute_with_args("select * from diskquota_namespace.database_list where dbid = $1", 1, argt, argv, NULL,
@@ -1598,7 +1598,7 @@ diskquota_status_schema_version()
 
 	SPI_connect_and_check();
 
-	int ret = SPI_execute("select extversion from pg_extension where extname = 'diskquota'", true, 0);
+	int         ret = SPI_execute("select extversion from pg_extension where extname = 'diskquota'", true, 0);
 	if (ret != SPI_OK_SELECT || SPI_processed != 1)
 	{
 		ereport(WARNING,

@@ -923,7 +923,7 @@ load_table_size(StringInfoData *active_oids)
 	int        i;
 	SPIPlanPtr plan;
 	Portal     portal;
-	char      *sql = "select tableid, size, segid from diskquota.table_size";
+	char      *sql                        = "select tableid, size, segid from diskquota.table_size";
 
 	Assert(active_oids->len == 0);
 
