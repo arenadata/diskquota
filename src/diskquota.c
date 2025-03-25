@@ -178,7 +178,7 @@ is_altering_extension_to_default_version(char *version)
 	int  spi_ret;
 	bool ret    = false;
 	bool pushed = SPI_push_cond_and_connect();
-	spi_ret = SPI_execute("select default_version from pg_available_extensions where name ='diskquota'", true, 0);
+	spi_ret     = SPI_execute("select default_version from pg_available_extensions where name ='diskquota'", true, 0);
 	if (spi_ret != SPI_OK_SELECT)
 		elog(ERROR, "[diskquota] failed to select diskquota default version during diskquota update.");
 	if (SPI_processed > 0)
@@ -1596,7 +1596,7 @@ diskquota_status_schema_version()
 {
 	static char ret_version[64];
 	bool        pushed = SPI_push_cond_and_connect();
-	int         ret = SPI_execute("select extversion from pg_extension where extname = 'diskquota'", true, 0);
+	int         ret    = SPI_execute("select extversion from pg_extension where extname = 'diskquota'", true, 0);
 
 	if (ret != SPI_OK_SELECT || SPI_processed != 1)
 	{
