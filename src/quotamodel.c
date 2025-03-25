@@ -735,8 +735,7 @@ do_check_diskquota_state_is_ready(void)
 {
 	int       ret;
 	TupleDesc tupdesc;
-
-	SPI_connect_and_check();
+	bool      connected_in_this_function = SPI_connect_if_not_yet();
 	ret                                  = SPI_execute("select state from diskquota.state", true, 0);
 	ereportif(ret != SPI_OK_SELECT, ERROR,
 	          (errcode(ERRCODE_INTERNAL_ERROR),
@@ -764,7 +763,7 @@ do_check_diskquota_state_is_ready(void)
 	state         = isnull ? DISKQUOTA_UNKNOWN_STATE : DatumGetInt32(dat);
 	bool is_ready = state == DISKQUOTA_READY_STATE;
 
-	SPI_finish_and_check();
+	SPI_finish_if(connected_in_this_function);
 
 	if (!is_ready && !diskquota_is_readiness_logged())
 	{
@@ -1140,15 +1139,14 @@ delete_from_table_size_map(DeleteArrays *arrays)
 {
 	Datum tableid                    = makeArrayResult(arrays->tableids, CurrentMemoryContext);
 	Datum segid                      = makeArrayResult(arrays->segids, CurrentMemoryContext);
-
-	SPI_connect_and_check();
+	bool  connected_in_this_function = SPI_connect_if_not_yet();
 	int   ret                        = SPI_execute_with_args(
 	                                 "delete from diskquota.table_size where (tableid, segid) in (select * from unnest($1, $2))", 2,
 	                                 (Oid[]){OIDARRAYOID, INT2ARRAYOID}, (Datum[]){tableid, segid}, NULL, false, 0);
 	ereportif(ret != SPI_OK_DELETE, ERROR,
 	          (errcode(ERRCODE_INTERNAL_ERROR),
 	           errmsg("[diskquota] delete_from_table_size_map SPI_execute failed: error code %d", ret)));
-	SPI_finish_and_check();
+	SPI_finish_if(connected_in_this_function);
 	pfree(DatumGetPointer(tableid));
 	pfree(DatumGetPointer(segid));
 	arrays->tableids = NULL;
@@ -1161,22 +1159,22 @@ update_table_size_map(UpdateArrays *arrays)
 	Datum tableid                    = makeArrayResult(arrays->tableids, CurrentMemoryContext);
 	Datum size                       = makeArrayResult(arrays->sizes, CurrentMemoryContext);
 	Datum segid                      = makeArrayResult(arrays->segids, CurrentMemoryContext);
-	SPI_connect_and_check();
+	bool  connected_in_this_function = SPI_connect_if_not_yet();
 	int   ret                        = SPI_execute_with_args(
 	                                 "delete from diskquota.table_size where (tableid, segid) in (select * from unnest($1, $2))", 2,
 	                                 (Oid[]){OIDARRAYOID, INT2ARRAYOID}, (Datum[]){tableid, segid}, NULL, false, 0);
 	ereportif(ret != SPI_OK_DELETE, ERROR,
 	          (errcode(ERRCODE_INTERNAL_ERROR),
 	           errmsg("[diskquota] delete_from_table_size_map SPI_execute failed: error code %d", ret)));
-	SPI_finish_and_check();
-	SPI_connect_and_check();
+	SPI_finish_if(connected_in_this_function);
+	connected_in_this_function = SPI_connect_if_not_yet();
 	ret = SPI_execute_with_args("insert into diskquota.table_size select * from unnest($1, $2, $3)", 3,
 	                            (Oid[]){OIDARRAYOID, INT8ARRAYOID, INT2ARRAYOID}, (Datum[]){tableid, size, segid}, NULL,
 	                            false, 0);
 	ereportif(ret != SPI_OK_INSERT, ERROR,
 	          (errcode(ERRCODE_INTERNAL_ERROR),
 	           errmsg("[diskquota] insert_into_table_size_map SPI_execute failed: error code %d", ret)));
-	SPI_finish_and_check();
+	SPI_finish_if(connected_in_this_function);
 	pfree(DatumGetPointer(tableid));
 	pfree(DatumGetPointer(size));
 	pfree(DatumGetPointer(segid));
@@ -1439,7 +1437,7 @@ do_load_quotas(void)
 	 */
 	clean_all_quota_limit();
 
-	SPI_connect_and_check();
+	bool connected_in_this_function = SPI_connect_if_not_yet();
 	/*
 	 * read quotas from diskquota.quota_config and target table
 	 */
@@ -1521,7 +1519,7 @@ do_load_quotas(void)
 		}
 	}
 
-	SPI_finish_and_check();
+	SPI_finish_if(connected_in_this_function);
 }
 
 /*
@@ -2266,9 +2264,9 @@ update_monitor_db_mpp(Oid dbid, FetchTableStatType action, const char *schema)
 	                 "SELECT %s.diskquota_fetch_table_stat(%d, '{%d}'::oid[]) FROM gp_dist_random('gp_id')", schema,
 	                 action, dbid);
 	/* Add current database to the monitored db cache on all segments */
-	SPI_connect_and_check();
+	bool connected_in_this_function = SPI_connect_if_not_yet();
 	int  ret                        = SPI_execute(sql_command.data, true, 0);
-	SPI_finish_and_check();
+	SPI_finish_if(connected_in_this_function);
 	pfree(sql_command.data);
 
 	ereportif(ret != SPI_OK_SELECT, ERROR,
