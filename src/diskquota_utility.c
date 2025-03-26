@@ -1698,8 +1698,6 @@ SPI_push_cond_and_connect(void)
 void
 SPI_finish_and_pop_cond(bool pushed)
 {
-	if (!SPI_context()) SPI_restore_connection();
-
 	int rc = SPI_finish();
 
 	ereportif(rc != SPI_OK_FINISH, ERROR,
