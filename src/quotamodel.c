@@ -1551,8 +1551,8 @@ do_load_quotas(void)
 		        " where (quotaType = $1 and targetOid not in (select oid from pg_namespace))"
 		        "    or (quotaType = $2 and targetOid not in (select oid from pg_roles))"
 		        "    or (quotaType = $3 and targetOid not in (select oid from pg_tablespace))"
-		        "    or (quotaType in ($4, $5) and (targetOid, quotaType) not in (select rowId, quotaType from "
-		        "diskquota.target))",
+		        "    or (quotaType in ($4, $5)"
+		        "        and (targetOid, quotaType) not in (select rowId, quotaType from diskquota.target))",
 		        5,
 		        (Oid[]){
 		                INT4OID,
