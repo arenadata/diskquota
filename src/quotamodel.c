@@ -1504,25 +1504,7 @@ do_load_quotas(void)
 			targetOid = primaryOid;
 		}
 
-		int cacheid;
-		switch (quotaType)
-		{
-			case NAMESPACE_QUOTA:
-			case NAMESPACE_TABLESPACE_QUOTA:
-				cacheid = NAMESPACEOID;
-				break;
-			case ROLE_QUOTA:
-			case ROLE_TABLESPACE_QUOTA:
-				cacheid = AUTHOID;
-				break;
-			case TABLESPACE_QUOTA:
-				cacheid = TABLESPACEOID;
-				break;
-			default:
-				Assert(false); /* never reach here */
-		}
-
-		if (!SearchSysCacheExists1(cacheid, ObjectIdGetDatum(targetOid)))
+		if (!SearchSysCacheExists1(quota_key_caches[quotaType][0], ObjectIdGetDatum(targetOid)))
 		{
 			cleanConfigTables = true;
 			continue;
@@ -1549,20 +1531,44 @@ do_load_quotas(void)
 
 	if (cleanConfigTables)
 	{
-		SPI_execute(
+		SPI_execute_with_args(
 		        "delete from diskquota.target"
-		        " where (quotaType = 2 and primaryOid not in (select oid from pg_namespace))"
-		        "    or (quotaType = 3 and primaryOid not in (select oid from pg_roles))"
+		        " where (quotaType = $1 and primaryOid not in (select oid from pg_namespace))"
+		        "    or (quotaType = $2 and primaryOid not in (select oid from pg_roles))"
 		        "    or tablespaceOid not in (select oid from pg_tablespace)",
-		        false, 0);
-		SPI_execute(
+		        2,
+		        (Oid[]){
+		                INT4OID,
+		                INT4OID,
+		        },
+		        (Datum[]){
+		                Int32GetDatum(NAMESPACE_TABLESPACE_QUOTA),
+		                Int32GetDatum(ROLE_TABLESPACE_QUOTA),
+		        },
+		        NULL, false, 0);
+		SPI_execute_with_args(
 		        "delete from diskquota.quota_config"
-		        " where (quotaType = 0 and targetOid not in (select oid from pg_namespace))"
-		        "    or (quotaType = 1 and targetOid not in (select oid from pg_roles))"
-		        "    or (quotaType = 4 and targetOid not in (select oid from pg_tablespace))"
-		        "    or (quotaType in (2, 3) and (targetOid, quotaType) not in (select rowId, quotaType from "
+		        " where (quotaType = $1 and targetOid not in (select oid from pg_namespace))"
+		        "    or (quotaType = $2 and targetOid not in (select oid from pg_roles))"
+		        "    or (quotaType = $3 and targetOid not in (select oid from pg_tablespace))"
+		        "    or (quotaType in ($4, $5) and (targetOid, quotaType) not in (select rowId, quotaType from "
 		        "diskquota.target))",
-		        false, 0);
+		        5,
+		        (Oid[]){
+		                INT4OID,
+		                INT4OID,
+		                INT4OID,
+		                INT4OID,
+		                INT4OID,
+		        },
+		        (Datum[]){
+		                Int32GetDatum(NAMESPACE_QUOTA),
+		                Int32GetDatum(ROLE_QUOTA),
+		                Int32GetDatum(TABLESPACE_QUOTA),
+		                Int32GetDatum(NAMESPACE_TABLESPACE_QUOTA),
+		                Int32GetDatum(ROLE_TABLESPACE_QUOTA),
+		        },
+		        NULL, false, 0);
 	}
 
 	SPI_finish_if(connected_in_this_function);
