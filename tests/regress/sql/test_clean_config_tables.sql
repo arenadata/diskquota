@@ -90,7 +90,7 @@ LEFT JOIN pg_tablespace s ON s.oid = c.tablespaceoid
 LEFT JOIN pg_namespace n ON n.oid = c.primaryoid
 WHERE c.quotatype = 2;
 
-DROP TABLESPACE ts3;
+DROP TABLESPACE ts1;
 
 SELECT diskquota.wait_for_worker_new_epoch();
 
@@ -105,7 +105,7 @@ WHERE c.quotatype = 2;
 
 -- ROLE_TABLESPACE_QUOTA
 
-CREATE TABLESPACE ts3 LOCATION '/tmp/ts3';
+CREATE TABLESPACE ts1 LOCATION '/tmp/ts1';
 
 SELECT diskquota.set_role_tablespace_quota(r, ts, '1GB')
 FROM (VALUES ('r1'), ('r3')) AS vr(r), (VALUES ('ts1'), ('ts3')) AS vts(ts);
@@ -122,7 +122,7 @@ LEFT JOIN pg_tablespace s ON s.oid = c.tablespaceoid
 LEFT JOIN pg_authid a ON a.oid = c.primaryoid
 WHERE c.quotatype = 3;
 
-DROP TABLESPACE ts3;
+DROP TABLESPACE ts1;
 
 SELECT diskquota.wait_for_worker_new_epoch();
 
@@ -155,5 +155,5 @@ TRUNCATE TABLE diskquota.target;
 TRUNCATE TABLE diskquota.quota_config;
 DROP SCHEMA s3;
 DROP ROLE r3;
-DROP TABLESPACE ts1;
+DROP TABLESPACE ts3;
 \! rm -rf /tmp/ts1 /tmp/ts2 /tmp/ts3
