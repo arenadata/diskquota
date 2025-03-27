@@ -22,12 +22,8 @@
 #endif /* GP_VERSION_NUM */
 #include "access/xact.h"
 #include "catalog/catalog.h"
-#include "catalog/namespace.h"
 #include "catalog/objectaccess.h"
-#include "catalog/pg_authid.h"
 #include "catalog/pg_extension.h"
-#include "catalog/pg_namespace.h"
-#include "catalog/pg_tablespace.h"
 #include "cdb/cdbdisp_query.h"
 #include "cdb/cdbdispatchresult.h"
 #include "cdb/cdbvars.h"
@@ -202,78 +198,15 @@ object_access_hook_QuotaStmt(ObjectAccessType access, Oid classId, Oid objectId,
 {
 	if (prev_object_access_hook) (*prev_object_access_hook)(access, classId, objectId, subId, arg);
 
-	if (access == OAT_DROP)
+	/* if is 'drop extension diskquota' */
+	if (classId == ExtensionRelationId && access == OAT_DROP)
 	{
-		switch (classId)
+		if (get_extension_oid("diskquota", true) == objectId)
 		{
-			case ExtensionRelationId:
-				/* if is 'drop extension diskquota' */
-				if (get_extension_oid("diskquota", true) == objectId)
-				{
-					invalidate_database_rejectmap(MyDatabaseId);
-					diskquota_stop_worker();
-				}
-				return;
-
-			case NamespaceRelationId:
-			case AuthIdRelationId:
-			case TableSpaceRelationId: {
-				if (Gp_role != GP_ROLE_DISPATCH) return;
-
-				Oid namespaceId = get_namespace_oid("diskquota", true);
-				if (!OidIsValid(namespaceId) || !OidIsValid(get_relname_relid("quota_config", namespaceId)) ||
-				    !OidIsValid(get_relname_relid("target", namespaceId)))
-					return;
-
-				bool connected_in_this_function = SPI_connect_if_not_yet();
-				if (classId == TableSpaceRelationId)
-				{
-					SPI_execute_with_args("delete from diskquota.target where tablespaceOid = $1", 1,
-					                      (Oid[]){
-					                              OIDOID,
-					                      },
-					                      (Datum[]){
-					                              ObjectIdGetDatum(objectId),
-					                      },
-					                      NULL, false, 0);
-				}
-				else
-				{
-					SPI_execute_with_args(
-					        "delete from diskquota.target where quotaType = $1 and primaryOid = $2", 2,
-					        (Oid[]){
-					                INT4OID,
-					                OIDOID,
-					        },
-					        (Datum[]){
-					                Int32GetDatum(classId == NamespaceRelationId ? NAMESPACE_TABLESPACE_QUOTA
-					                                                             : ROLE_TABLESPACE_QUOTA),
-					                ObjectIdGetDatum(objectId),
-					        },
-					        NULL, false, 0);
-				}
-
-				SPI_execute_with_args(
-				        "delete from diskquota.quota_config where (quotaType = $1 and targetOid = $2)"
-				        " or (quotaType in (2, 3) and (targetOid, quotaType) not in (select rowId, quotaType from "
-				        "diskquota.target))",
-				        2,
-				        (Oid[]){
-				                INT4OID,
-				                OIDOID,
-				        },
-				        (Datum[]){
-				                Int32GetDatum(classId == NamespaceRelationId
-				                                      ? NAMESPACE_QUOTA
-				                                      : (classId == AuthIdRelationId ? ROLE_QUOTA : TABLESPACE_QUOTA)),
-				                ObjectIdGetDatum(objectId),
-				        },
-				        NULL, false, 0);
-
-				SPI_finish_if(connected_in_this_function);
-				return;
-			}
+			invalidate_database_rejectmap(MyDatabaseId);
+			diskquota_stop_worker();
 		}
+		return;
 	}
 
 	/* TODO: do we need to use "&&" instead of "||"? */

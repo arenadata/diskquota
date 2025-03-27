@@ -1504,20 +1504,28 @@ do_load_quotas(void)
 			targetOid = primaryOid;
 		}
 
-		int cacheid = AUTHOID;
+		int cacheid;
 		switch (quotaType)
 		{
 			case NAMESPACE_QUOTA:
 			case NAMESPACE_TABLESPACE_QUOTA:
 				cacheid = NAMESPACEOID;
-				/* fallthrough */
+				break;
 			case ROLE_QUOTA:
 			case ROLE_TABLESPACE_QUOTA:
-				if (!SearchSysCacheExists1(cacheid, ObjectIdGetDatum(targetOid)))
-				{
-					cleanConfigTables = true;
-					continue;
-				}
+				cacheid = AUTHOID;
+				break;
+			case TABLESPACE_QUOTA:
+				cacheid = TABLESPACEOID;
+				break;
+			default:
+				Assert(false); /* never reach here */
+		}
+
+		if (!SearchSysCacheExists1(cacheid, ObjectIdGetDatum(targetOid)))
+		{
+			cleanConfigTables = true;
+			continue;
 		}
 
 		if (spcOid == InvalidOid)

@@ -2,7 +2,7 @@
 -- diskquota.target) when schema, tablespace or role is dropped.
 
 -- start_ignore
-DROP SCHEMA IF EXISTS s1, s2, s3;
+DROP SCHEMA IF EXISTS s1, s2, s3 CASCADE;
 DROP ROLE IF EXISTS r1, r2, r3;
 DROP TABLESPACE IF EXISTS ts1;
 DROP TABLESPACE IF EXISTS ts2;
@@ -24,6 +24,8 @@ FROM (VALUES('s1'), ('s2'), ('s3')) v(s);
 
 DROP SCHEMA s2;
 
+SELECT diskquota.wait_for_worker_new_epoch();
+
 SELECT n.nspname
 FROM diskquota.quota_config c
 LEFT JOIN pg_namespace n ON n.oid = c.targetoid
@@ -40,6 +42,8 @@ SELECT diskquota.set_role_quota(r, '100GB')
 FROM (VALUES('r1'), ('r2'), ('r3')) v(r);
 
 DROP ROLE r2;
+
+SELECT diskquota.wait_for_worker_new_epoch();
 
 SELECT a.rolname
 FROM diskquota.quota_config c
@@ -61,6 +65,8 @@ FROM (VALUES('ts1'), ('ts2'), ('ts3')) v(ts);
 
 DROP TABLESPACE ts2;
 
+SELECT diskquota.wait_for_worker_new_epoch();
+
 SELECT s.spcname
 FROM diskquota.quota_config c
 LEFT JOIN pg_tablespace s ON s.oid = c.targetoid
@@ -74,6 +80,8 @@ FROM (VALUES ('s1'), ('s3')) AS vs(s), (VALUES ('ts1'), ('ts3')) AS vts(ts);
 
 DROP SCHEMA s1;
 
+SELECT diskquota.wait_for_worker_new_epoch();
+
 SELECT count() FROM diskquota.quota_config WHERE quotatype = 2;
 
 SELECT s.spcname, n.nspname
@@ -83,6 +91,8 @@ LEFT JOIN pg_namespace n ON n.oid = c.primaryoid
 WHERE c.quotatype = 2;
 
 DROP TABLESPACE ts3;
+
+SELECT diskquota.wait_for_worker_new_epoch();
 
 SELECT count() FROM diskquota.quota_config WHERE quotatype = 2;
 
@@ -102,6 +112,8 @@ FROM (VALUES ('r1'), ('r3')) AS vr(r), (VALUES ('ts1'), ('ts3')) AS vts(ts);
 
 DROP ROLE r1;
 
+SELECT diskquota.wait_for_worker_new_epoch();
+
 SELECT count() FROM diskquota.quota_config WHERE quotatype = 3;
 
 SELECT s.spcname, a.rolname
@@ -111,6 +123,8 @@ LEFT JOIN pg_authid a ON a.oid = c.primaryoid
 WHERE c.quotatype = 3;
 
 DROP TABLESPACE ts3;
+
+SELECT diskquota.wait_for_worker_new_epoch();
 
 SELECT count() FROM diskquota.quota_config WHERE quotatype = 3;
 
