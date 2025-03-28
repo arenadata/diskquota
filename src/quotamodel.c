@@ -1499,6 +1499,13 @@ do_load_quotas(void)
 		Oid   spcOid         = DatumGetObjectId(vals[4]);
 		Oid   primaryOid     = DatumGetObjectId(vals[5]);
 
+		if (quotaType < 0 || quotaType >= NUM_QUOTA_TYPES)
+		{
+			ereport(ERROR,
+			        (errcode(ERRCODE_INTERNAL_ERROR),
+			         errmsg("[diskquota] diskquota.quota_config.quotaType MUST be >= 0 and < %d", NUM_QUOTA_TYPES)));
+		}
+
 		if (quotaType == NAMESPACE_TABLESPACE_QUOTA || quotaType == ROLE_TABLESPACE_QUOTA)
 		{
 			targetOid = primaryOid;
