@@ -1475,6 +1475,7 @@ do_load_quotas(void)
 		                       get_database_name(MyDatabaseId))));
 	}
 
+	bool cleanConfigTables = false;
 	for (i = 0; i < SPI_processed; i++)
 	{
 		HeapTuple tup = SPI_tuptable->vals[i];
@@ -1498,9 +1499,22 @@ do_load_quotas(void)
 		Oid   spcOid         = DatumGetObjectId(vals[4]);
 		Oid   primaryOid     = DatumGetObjectId(vals[5]);
 
+		if (quotaType < 0 || quotaType >= NUM_QUOTA_TYPES)
+		{
+			ereport(ERROR,
+			        (errcode(ERRCODE_INTERNAL_ERROR),
+			         errmsg("[diskquota] diskquota.quota_config.quotaType MUST be >= 0 and < %d", NUM_QUOTA_TYPES)));
+		}
+
 		if (quotaType == NAMESPACE_TABLESPACE_QUOTA || quotaType == ROLE_TABLESPACE_QUOTA)
 		{
 			targetOid = primaryOid;
+		}
+
+		if (!SearchSysCacheExists1(quota_key_caches[quotaType][0], ObjectIdGetDatum(targetOid)))
+		{
+			cleanConfigTables = true;
+			continue;
 		}
 
 		if (spcOid == InvalidOid)
@@ -1515,8 +1529,53 @@ do_load_quotas(void)
 		}
 		else
 		{
-			update_limit_for_quota(quota_limit_mb * (1 << 20), segratio, quotaType, (Oid[]){targetOid, spcOid});
+			if (SearchSysCacheExists1(TABLESPACEOID, ObjectIdGetDatum(spcOid)))
+				update_limit_for_quota(quota_limit_mb * (1 << 20), segratio, quotaType, (Oid[]){targetOid, spcOid});
+			else
+				cleanConfigTables = true;
 		}
+	}
+
+	if (cleanConfigTables)
+	{
+		SPI_execute_with_args(
+		        "delete from diskquota.target"
+		        " where (quotaType = $1 and primaryOid not in (select oid from pg_namespace))"
+		        "    or (quotaType = $2 and primaryOid not in (select oid from pg_roles))"
+		        "    or tablespaceOid not in (select oid from pg_tablespace)",
+		        2,
+		        (Oid[]){
+		                INT4OID,
+		                INT4OID,
+		        },
+		        (Datum[]){
+		                Int32GetDatum(NAMESPACE_TABLESPACE_QUOTA),
+		                Int32GetDatum(ROLE_TABLESPACE_QUOTA),
+		        },
+		        NULL, false, 0);
+		SPI_execute_with_args(
+		        "delete from diskquota.quota_config"
+		        " where (quotaType = $1 and targetOid not in (select oid from pg_namespace))"
+		        "    or (quotaType = $2 and targetOid not in (select oid from pg_roles))"
+		        "    or (quotaType = $3 and targetOid not in (select oid from pg_tablespace))"
+		        "    or (quotaType in ($4, $5)"
+		        "        and (targetOid, quotaType) not in (select rowId, quotaType from diskquota.target))",
+		        5,
+		        (Oid[]){
+		                INT4OID,
+		                INT4OID,
+		                INT4OID,
+		                INT4OID,
+		                INT4OID,
+		        },
+		        (Datum[]){
+		                Int32GetDatum(NAMESPACE_QUOTA),
+		                Int32GetDatum(ROLE_QUOTA),
+		                Int32GetDatum(TABLESPACE_QUOTA),
+		                Int32GetDatum(NAMESPACE_TABLESPACE_QUOTA),
+		                Int32GetDatum(ROLE_TABLESPACE_QUOTA),
+		        },
+		        NULL, false, 0);
 	}
 
 	SPI_finish_and_pop_cond(pushed);
