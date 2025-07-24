@@ -110,34 +110,11 @@ setup_gpadmin() {
     chown gpadmin:gpadmin /home/gpadmin
 }
 
-# Extract gpdb binary
-function install_gpdb() {
-    [ ! -d /usr/local/greenplum-db-devel ] && mkdir -p /usr/local/greenplum-db-devel
-    tar -xzf "${CONCOURSE_WORK_DIR}"/bin_gpdb/bin_gpdb.tar.gz -C /usr/local/greenplum-db-devel
-    chown -R gpadmin:gpadmin /usr/local/greenplum-db-devel
-}
-
-## Currently, isolation2 testing framework relies on pg_isolation2_regress, we
-## should build it from source. However, in concourse, the gpdb_bin is fetched
-## from remote machine, the $(abs_top_srcdir) variable points to a non-existing
-## location, we fixes this issue by creating a symbolic link for it.
-function create_fake_gpdb_src() {
-    local fake_gpdb_src
-    fake_gpdb_src="$(\
-        grep -rhw '/usr/local/greenplum-db-devel' -e 'abs_top_srcdir = .*' |\
-        head -n 1 | awk '{ print $NF; }')"
-
-    pushd /home/gpadmin/gpdb_src
-    ./configure --prefix=/usr/local/greenplum-db-devel \
-        --without-zstd \
-        --disable-orca --disable-gpcloud --enable-debug-extensions
-    popd
-}
-
 # Setup common environment
-setup_gpadmin
+source "/home/gpadmin/gpdb_src/concourse/scripts/common.bash"
 install_cmake
 install_gpdb
+setup_gpadmin
 
 # Do the special setup with root permission for the each task, then run the real task script with
 # gpadmin. bashrc won't be read by 'su', it needs to be sourced explicitly.
@@ -151,10 +128,8 @@ case "$1" in
         # Build task output is diskquota_artifacts, which is different from test taks input
         # diskquota_bin. Ideally we can use the same name for input and output. But that will cause
         # compatible issues with 1.x pipeline script.
-        #ln -s /home/gpadmin/bin_diskquota /home/gpadmin/diskquota_artifacts
-        create_fake_gpdb_src
         # Create GPDB cluster
-        source "/home/gpadmin/gpdb_src/concourse/scripts/common.bash"
+        configure
         make_cluster
         # To make fly debug easier
         echo "source /usr/local/greenplum-db-devel/greenplum_path.sh" >> /home/gpadmin/.bashrc
