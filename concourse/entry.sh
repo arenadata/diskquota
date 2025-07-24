@@ -131,6 +131,8 @@ case "$1" in
         # Create GPDB cluster
         configure
         make_cluster
+        # Change owner to install extension
+        chown -R gpadmin:gpadmin $GPHOME
         # To make fly debug easier
         echo "source /usr/local/greenplum-db-devel/greenplum_path.sh" >> /home/gpadmin/.bashrc
         su gpadmin -c \
