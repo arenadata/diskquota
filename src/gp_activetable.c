@@ -244,8 +244,9 @@ report_altered_reloid(Oid reloid)
 	if (IsRoleMirror() || IS_QUERY_DISPATCHER()) return;
 
 	LWLockAcquire(diskquota_locks.altered_reloid_cache_lock, LW_EXCLUSIVE);
-	HASHACTION action = check_hash_fullness(altered_reloid_cache, diskquota_max_active_tables,
-	                                        altered_reloid_cache_warning, &altered_reloid_cache_last_overflow_report);
+	HASHACTION action = check_hash_fullness(diskquota_locks.altered_reloid_cache_lock, altered_reloid_cache,
+	                                        diskquota_max_active_tables, altered_reloid_cache_warning,
+	                                        &altered_reloid_cache_last_overflow_report);
 	hash_search(altered_reloid_cache, &reloid, action, NULL);
 	LWLockRelease(diskquota_locks.altered_reloid_cache_lock);
 }
@@ -328,9 +329,10 @@ report_active_table_helper(const RelFileNodeBackend *relFileNode)
 	item.tablespaceoid = relFileNode->node.spcNode;
 
 	LWLockAcquire(diskquota_locks.active_table_lock, LW_EXCLUSIVE);
-	HASHACTION action = check_hash_fullness(active_tables_map, diskquota_max_active_tables, active_tables_map_warning,
-	                                        &active_tables_map_last_overflow_report);
-	entry             = hash_search(active_tables_map, &item, action, &found);
+	HASHACTION action =
+	        check_hash_fullness(diskquota_locks.active_table_lock, active_tables_map, diskquota_max_active_tables,
+	                            active_tables_map_warning, &active_tables_map_last_overflow_report);
+	entry = hash_search(active_tables_map, &item, action, &found);
 	if (entry && !found) *entry = item;
 
 	LWLockRelease(diskquota_locks.active_table_lock);
@@ -835,8 +837,9 @@ get_active_tables_oid(void)
 	hash_seq_init(&iter, local_active_table_file_map);
 	while ((active_table_file_entry = (DiskQuotaActiveTableFileEntry *)hash_seq_search(&iter)) != NULL)
 	{
-		HASHACTION action = check_hash_fullness(active_tables_map, diskquota_max_active_tables,
-		                                        active_tables_map_warning, &active_tables_map_last_overflow_report);
+		HASHACTION action =
+		        check_hash_fullness(diskquota_locks.active_table_lock, active_tables_map, diskquota_max_active_tables,
+		                            active_tables_map_warning, &active_tables_map_last_overflow_report);
 		hash_search(active_tables_map, active_table_file_entry, action, NULL);
 	}
 	/* TODO: hash_seq_term(&iter); */
@@ -899,8 +902,9 @@ get_active_tables_oid(void)
 		LWLockAcquire(diskquota_locks.active_table_lock, LW_EXCLUSIVE);
 		while ((active_table_file_entry = (DiskQuotaActiveTableFileEntry *)hash_seq_search(&iter)) != NULL)
 		{
-			HASHACTION action = check_hash_fullness(active_tables_map, diskquota_max_active_tables,
-			                                        active_tables_map_warning, &active_tables_map_last_overflow_report);
+			HASHACTION action = check_hash_fullness(diskquota_locks.active_table_lock, active_tables_map,
+			                                        diskquota_max_active_tables, active_tables_map_warning,
+			                                        &active_tables_map_last_overflow_report);
 			entry             = hash_search(active_tables_map, active_table_file_entry, action, &found);
 			if (entry) *entry = *active_table_file_entry;
 		}

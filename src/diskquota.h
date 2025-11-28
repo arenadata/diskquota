@@ -141,6 +141,9 @@ struct DiskQuotaLocks
 	LWLock *dblist_lock;
 	LWLock *workerlist_lock;
 	LWLock *altered_reloid_cache_lock;
+	LWLock *quota_info_map_lock;
+	LWLock *table_size_map_lock;
+	LWLock *local_disk_quota_reject_map_lock;
 };
 typedef struct DiskQuotaLocks DiskQuotaLocks;
 #define DiskQuotaLocksItemNumber (sizeof(DiskQuotaLocks) / sizeof(void *))
@@ -317,7 +320,7 @@ extern HTAB        *diskquota_hash_create(const char *tabname, long nelem, HASHC
 extern HTAB *DiskquotaShmemInitHash(const char *name, long init_size, long max_size, HASHCTL *infoP, int hash_flags,
                                     DiskquotaHashFunction hash_function);
 extern void  refresh_monitored_dbid_cache(void);
-extern HASHACTION check_hash_fullness(HTAB *hashp, int max_size, const char *warning_message,
+extern HASHACTION check_hash_fullness(LWLock *lock, HTAB *hashp, int max_size, const char *warning_message,
                                       TimestampTz *last_overflow_report);
 bool              SPI_push_cond_and_connect(void);
 void              SPI_finish_and_pop_cond(bool pushed);

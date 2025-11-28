@@ -264,8 +264,8 @@ update_size_for_quota(int64 size, QuotaType type, Oid *keys, int16 segid)
 	memcpy(key.keys, keys, quota_key_num[type] * sizeof(Oid));
 	key.type  = type;
 	key.segid = segid;
-	action    = check_hash_fullness(quota_info_map, diskquota_max_quota_probes, quota_info_map_warning,
-	                                quota_info_map_last_overflow_report);
+	action    = check_hash_fullness(diskquota_locks.quota_info_map_lock, quota_info_map, diskquota_max_quota_probes,
+	                                quota_info_map_warning, quota_info_map_last_overflow_report);
 	entry     = hash_search(quota_info_map, &key, action, &found);
 	/* If the number of quota exceeds the limit, entry will be NULL */
 	if (entry == NULL) return;
@@ -291,8 +291,8 @@ update_limit_for_quota(int64 limit, float segratio, QuotaType type, Oid *keys)
 		memcpy(key.keys, keys, quota_key_num[type] * sizeof(Oid));
 		key.type  = type;
 		key.segid = i;
-		action    = check_hash_fullness(quota_info_map, diskquota_max_quota_probes, quota_info_map_warning,
-		                                quota_info_map_last_overflow_report);
+		action    = check_hash_fullness(diskquota_locks.quota_info_map_lock, quota_info_map, diskquota_max_quota_probes,
+		                                quota_info_map_warning, quota_info_map_last_overflow_report);
 		entry     = hash_search(quota_info_map, &key, action, &found);
 		/* If the number of quota exceeds the limit, entry will be NULL */
 		if (entry == NULL) continue;
@@ -322,8 +322,9 @@ add_quota_to_rejectmap(QuotaType type, Oid targetOid, Oid tablespaceoid, bool se
 	keyitem.tablespaceoid = tablespaceoid;
 	keyitem.targettype    = (uint32)type;
 	HASHACTION action =
-	        check_hash_fullness(local_disk_quota_reject_map, diskquota_max_local_reject_entries,
-	                            local_disk_quota_reject_map_warning, local_disk_quota_reject_map_last_overflow_report);
+	        check_hash_fullness(diskquota_locks.local_disk_quota_reject_map_lock, local_disk_quota_reject_map,
+	                            diskquota_max_local_reject_entries, local_disk_quota_reject_map_warning,
+	                            local_disk_quota_reject_map_last_overflow_report);
 	localrejectentry = hash_search(local_disk_quota_reject_map, &keyitem, action, NULL);
 	if (localrejectentry)
 	{
@@ -488,26 +489,32 @@ static void
 init_lwlocks(void)
 {
 #if GP_VERSION_NUM < 70000
-	diskquota_locks.active_table_lock          = LWLockAssign();
-	diskquota_locks.reject_map_lock            = LWLockAssign();
-	diskquota_locks.extension_ddl_message_lock = LWLockAssign();
-	diskquota_locks.extension_ddl_lock         = LWLockAssign();
-	diskquota_locks.monitored_dbid_cache_lock  = LWLockAssign();
-	diskquota_locks.relation_cache_lock        = LWLockAssign();
-	diskquota_locks.dblist_lock                = LWLockAssign();
-	diskquota_locks.workerlist_lock            = LWLockAssign();
-	diskquota_locks.altered_reloid_cache_lock  = LWLockAssign();
+	diskquota_locks.active_table_lock                = LWLockAssign();
+	diskquota_locks.reject_map_lock                  = LWLockAssign();
+	diskquota_locks.extension_ddl_message_lock       = LWLockAssign();
+	diskquota_locks.extension_ddl_lock               = LWLockAssign();
+	diskquota_locks.monitored_dbid_cache_lock        = LWLockAssign();
+	diskquota_locks.relation_cache_lock              = LWLockAssign();
+	diskquota_locks.dblist_lock                      = LWLockAssign();
+	diskquota_locks.workerlist_lock                  = LWLockAssign();
+	diskquota_locks.altered_reloid_cache_lock        = LWLockAssign();
+	diskquota_locks.quota_info_map_lock              = LWLockAssign();
+	diskquota_locks.table_size_map_lock              = LWLockAssign();
+	diskquota_locks.local_disk_quota_reject_map_lock = LWLockAssign();
 #else
-	LWLockPadded *lock_base                    = GetNamedLWLockTranche("DiskquotaLocks");
-	diskquota_locks.active_table_lock          = &lock_base[0].lock;
-	diskquota_locks.reject_map_lock            = &lock_base[1].lock;
-	diskquota_locks.extension_ddl_message_lock = &lock_base[2].lock;
-	diskquota_locks.extension_ddl_lock         = &lock_base[3].lock;
-	diskquota_locks.monitored_dbid_cache_lock  = &lock_base[4].lock;
-	diskquota_locks.relation_cache_lock        = &lock_base[5].lock;
-	diskquota_locks.dblist_lock                = &lock_base[6].lock;
-	diskquota_locks.workerlist_lock            = &lock_base[7].lock;
-	diskquota_locks.altered_reloid_cache_lock  = &lock_base[8].lock;
+	LWLockPadded *lock_base                          = GetNamedLWLockTranche("DiskquotaLocks");
+	diskquota_locks.active_table_lock                = &lock_base[0].lock;
+	diskquota_locks.reject_map_lock                  = &lock_base[1].lock;
+	diskquota_locks.extension_ddl_message_lock       = &lock_base[2].lock;
+	diskquota_locks.extension_ddl_lock               = &lock_base[3].lock;
+	diskquota_locks.monitored_dbid_cache_lock        = &lock_base[4].lock;
+	diskquota_locks.relation_cache_lock              = &lock_base[5].lock;
+	diskquota_locks.dblist_lock                      = &lock_base[6].lock;
+	diskquota_locks.workerlist_lock                  = &lock_base[7].lock;
+	diskquota_locks.altered_reloid_cache_lock        = &lock_base[8].lock;
+	diskquota_locks.quota_info_map_lock              = &lock_base[9].lock;
+	diskquota_locks.table_size_map_lock              = &lock_base[10].lock;
+	diskquota_locks.local_disk_quota_reject_map_lock = &lock_base[11].lock;
 #endif /* GP_VERSION_NUM */
 }
 
@@ -902,10 +909,11 @@ static TableSizeEntry *
 get_table_size_map_entry(Oid oid, int16 segid)
 {
 	bool              found;
-	TableSizeEntryKey key     = {.reloid = oid, .id = TableSizeEntryId(segid)};
-	HASHACTION        action  = check_hash_fullness(table_size_map, MAX_NUM_TABLE_SIZE_ENTRIES, table_size_map_warning,
-	                                                table_size_map_last_overflow_report);
-	TableSizeEntry   *tsentry = hash_search(table_size_map, &key, action, &found);
+	TableSizeEntryKey key = {.reloid = oid, .id = TableSizeEntryId(segid)};
+	HASHACTION        action =
+	        check_hash_fullness(diskquota_locks.table_size_map_lock, table_size_map, MAX_NUM_TABLE_SIZE_ENTRIES,
+	                            table_size_map_warning, table_size_map_last_overflow_report);
+	TableSizeEntry *tsentry = hash_search(table_size_map, &key, action, &found);
 
 	if (!found && tsentry != NULL)
 	{
@@ -1288,10 +1296,10 @@ flush_local_reject_map(void)
 		 */
 		if (localrejectentry->isexceeded)
 		{
-			HASHACTION action =
-			        check_hash_fullness(disk_quota_reject_map, MAX_DISK_QUOTA_REJECT_ENTRIES,
-			                            disk_quota_reject_map_warning, &disk_quota_reject_map_last_overflow_report);
-			rejectentry = hash_search(disk_quota_reject_map, &localrejectentry->keyitem, action, &found);
+			HASHACTION action = check_hash_fullness(diskquota_locks.reject_map_lock, disk_quota_reject_map,
+			                                        MAX_DISK_QUOTA_REJECT_ENTRIES, disk_quota_reject_map_warning,
+			                                        &disk_quota_reject_map_last_overflow_report);
+			rejectentry       = hash_search(disk_quota_reject_map, &localrejectentry->keyitem, action, &found);
 			if (rejectentry == NULL)
 			{
 				continue;
@@ -2165,10 +2173,10 @@ refresh_rejectmap(PG_FUNCTION_ARGS)
 		 */
 		if (OidIsValid(rejectmapentry->keyitem.targetoid)) continue;
 
-		HASHACTION action =
-		        check_hash_fullness(disk_quota_reject_map, MAX_DISK_QUOTA_REJECT_ENTRIES, disk_quota_reject_map_warning,
-		                            &disk_quota_reject_map_last_overflow_report);
-		new_entry = hash_search(disk_quota_reject_map, &rejectmapentry->keyitem, action, &found);
+		HASHACTION action = check_hash_fullness(diskquota_locks.reject_map_lock, disk_quota_reject_map,
+		                                        MAX_DISK_QUOTA_REJECT_ENTRIES, disk_quota_reject_map_warning,
+		                                        &disk_quota_reject_map_last_overflow_report);
+		new_entry         = hash_search(disk_quota_reject_map, &rejectmapentry->keyitem, action, &found);
 		if (!found && new_entry) memcpy(new_entry, rejectmapentry, sizeof(GlobalRejectMapEntry));
 	}
 	LWLockRelease(diskquota_locks.reject_map_lock);

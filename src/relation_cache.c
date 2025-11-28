@@ -189,8 +189,8 @@ update_relation_cache(Oid relid)
 
 	LWLockAcquire(diskquota_locks.relation_cache_lock, LW_EXCLUSIVE);
 
-	action         = check_hash_fullness(relation_cache, diskquota_max_active_tables, relation_cache_warning,
-	                                     &active_tables_map_last_overflow_report);
+	action = check_hash_fullness(diskquota_locks.relation_cache_lock, relation_cache, diskquota_max_active_tables,
+	                             relation_cache_warning, &active_tables_map_last_overflow_report);
 	relation_entry = hash_search(relation_cache, &relation_entry_data.relid, action, NULL);
 
 	if (relation_entry == NULL)
@@ -200,8 +200,8 @@ update_relation_cache(Oid relid)
 	}
 	memcpy(relation_entry, &relation_entry_data, sizeof(DiskQuotaRelationCacheEntry));
 
-	action      = check_hash_fullness(relid_cache, diskquota_max_active_tables, relid_cache_warning,
-	                                  &active_tables_map_last_overflow_report);
+	action      = check_hash_fullness(diskquota_locks.relation_cache_lock, relid_cache, diskquota_max_active_tables,
+	                                  relid_cache_warning, &active_tables_map_last_overflow_report);
 	relid_entry = hash_search(relid_cache, &relid_entry_data.relfilenode, action, NULL);
 	if (relid_entry == NULL)
 	{
