@@ -346,6 +346,7 @@ refresh_quota_info_map(void)
 	HASH_SEQ_STATUS iter;
 	QuotaInfoEntry *entry;
 
+	LWLockAcquire(diskquota_locks.local_disk_quota_reject_map_lock, LW_EXCLUSIVE);
 	hash_seq_init(&iter, quota_info_map);
 	while ((entry = hash_seq_search(&iter)) != NULL)
 	{
@@ -379,6 +380,7 @@ refresh_quota_info_map(void)
 			}
 		}
 	}
+	LWLockRelease(diskquota_locks.local_disk_quota_reject_map_lock);
 }
 
 /* transfer one table's size from one quota to another quota */
@@ -1495,6 +1497,7 @@ do_load_quotas(void)
 	}
 
 	bool cleanConfigTables = false;
+	LWLockAcquire(diskquota_locks.quota_info_map_lock, LW_EXCLUSIVE);
 	for (i = 0; i < SPI_processed; i++)
 	{
 		HeapTuple tup = SPI_tuptable->vals[i];
@@ -1554,6 +1557,7 @@ do_load_quotas(void)
 				cleanConfigTables = true;
 		}
 	}
+	LWLockRelease(diskquota_locks.quota_info_map_lock);
 
 	if (cleanConfigTables)
 	{
