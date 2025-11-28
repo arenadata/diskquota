@@ -385,8 +385,10 @@ refresh_quota_info_map(void)
 static void
 transfer_table_for_quota(int64 totalsize, QuotaType type, Oid *old_keys, Oid *new_keys, int16 segid)
 {
+	LWLockAcquire(diskquota_locks.quota_info_map_lock, LW_EXCLUSIVE);
 	update_size_for_quota(-totalsize, type, old_keys, segid);
 	update_size_for_quota(totalsize, type, new_keys, segid);
+	LWLockRelease(diskquota_locks.quota_info_map_lock);
 }
 
 static void
@@ -938,6 +940,7 @@ get_table_size_map_entry(Oid oid, int16 segid)
 void
 calculate_active_table_disk_usage(Oid oid, int64 size, int16 segid)
 {
+	LWLockAcquire(diskquota_locks.table_size_map_lock, LW_EXCLUSIVE);
 	TableSizeEntry *tsentry = get_table_size_map_entry(oid, segid);
 
 	if (tsentry == NULL)
@@ -945,6 +948,7 @@ calculate_active_table_disk_usage(Oid oid, int64 size, int16 segid)
 		/* Too many tables have been added to the table_size_map, to avoid diskquota using
 		   too much share memory, just return. The diskquota won't work correctly
 		   anymore. */
+		LWLockRelease(diskquota_locks.table_size_map_lock);
 		return;
 	}
 
@@ -968,12 +972,15 @@ calculate_active_table_disk_usage(Oid oid, int64 size, int16 segid)
 
 	/* update the disk usage, there may be entries in the map whose keys are InvlidOid as the tsentry does
 	 * not exist in the table_size_map */
+	LWLockAcquire(diskquota_locks.quota_info_map_lock, LW_EXCLUSIVE);
 	update_size_for_quota(updated_total_size, NAMESPACE_QUOTA, (Oid[]){tsentry->namespaceoid}, segid);
 	update_size_for_quota(updated_total_size, ROLE_QUOTA, (Oid[]){tsentry->owneroid}, segid);
 	update_size_for_quota(updated_total_size, ROLE_TABLESPACE_QUOTA, (Oid[]){tsentry->owneroid, tsentry->tablespaceoid},
 	                      segid);
 	update_size_for_quota(updated_total_size, NAMESPACE_TABLESPACE_QUOTA,
 	                      (Oid[]){tsentry->namespaceoid, tsentry->tablespaceoid}, segid);
+	LWLockRelease(diskquota_locks.quota_info_map_lock);
+	LWLockRelease(diskquota_locks.table_size_map_lock);
 }
 
 /*
@@ -1055,6 +1062,7 @@ track_namespace_owner_tablespace_changes(bool is_init)
 		 * and the content id is continuous, so it's safe to use SEGCOUNT
 		 * to get segid.
 		 */
+		LWLockAcquire(diskquota_locks.table_size_map_lock, LW_EXCLUSIVE);
 		for (int cur_segid = -1; cur_segid < SEGCOUNT; cur_segid++)
 		{
 			tsentry = get_table_size_map_entry(relOid, cur_segid);
@@ -1109,6 +1117,7 @@ track_namespace_owner_tablespace_changes(bool is_init)
 				tsentry->tablespaceoid = reltablespace;
 			}
 		}
+		LWLockRelease(diskquota_locks.table_size_map_lock);
 		if (HeapTupleIsValid(classTup))
 		{
 			heap_freetuple(classTup);
@@ -1130,6 +1139,7 @@ track_namespace_owner_tablespace_changes(bool is_init)
 			int seg_ed = TableSizeEntrySegidEnd(tsentry);
 			for (int i = seg_st; i < seg_ed; i++)
 			{
+				LWLockAcquire(diskquota_locks.quota_info_map_lock, LW_EXCLUSIVE);
 				update_size_for_quota(-TableSizeEntryGetSize(tsentry, i), NAMESPACE_QUOTA,
 				                      (Oid[]){tsentry->namespaceoid}, i);
 				update_size_for_quota(-TableSizeEntryGetSize(tsentry, i), ROLE_QUOTA, (Oid[]){tsentry->owneroid}, i);
@@ -1137,6 +1147,7 @@ track_namespace_owner_tablespace_changes(bool is_init)
 				                      (Oid[]){tsentry->owneroid, tsentry->tablespaceoid}, i);
 				update_size_for_quota(-TableSizeEntryGetSize(tsentry, i), NAMESPACE_TABLESPACE_QUOTA,
 				                      (Oid[]){tsentry->namespaceoid, tsentry->tablespaceoid}, i);
+				LWLockRelease(diskquota_locks.quota_info_map_lock);
 			}
 		}
 	}
