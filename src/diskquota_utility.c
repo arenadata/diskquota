@@ -1681,6 +1681,33 @@ check_hash_fullness(HTAB *hashp, int max_size, const char *warning_message, Time
 	return HASH_FIND;
 }
 
+HASHACTION
+check_hash_fullness_num(HTAB *hashp, pg_atomic_uint32 *counter, int max_size, const char *warning_message,
+                        TimestampTz *last_overflow_report)
+{
+	uint32 num_entries = pg_atomic_read_u32(counter);
+
+	if (num_entries < max_size)
+	{
+		(void)pg_atomic_add_fetch_u32(counter, 1);
+		return HASH_ENTER;
+	}
+
+	if (num_entries == max_size)
+	{
+		TimestampTz current_time = GetCurrentTimestamp();
+
+		if (*last_overflow_report == 0 || TimestampDifferenceExceeds(*last_overflow_report, current_time,
+		                                                             diskquota_hashmap_overflow_report_timeout * 1000))
+		{
+			ereport(WARNING, (errmsg("[diskquota] %s", warning_message)));
+			*last_overflow_report = current_time;
+		}
+	}
+
+	return HASH_FIND;
+}
+
 bool
 SPI_push_cond_and_connect(void)
 {
