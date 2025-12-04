@@ -42,6 +42,10 @@ static const char *relid_cache_warning =
         "the number of relid cache entries reached the limit, please increase "
         "the GUC value for diskquota.max_active_tables.";
 
+#ifdef USE_ASSERT_CHECKING
+extern pg_atomic_uint32 *diskquota_shmem_size;
+#endif
+
 static void update_relation_entry(Oid relid, DiskQuotaRelationCacheEntry *relation_entry,
                                   DiskQuotaRelidCacheEntry *relid_entry);
 
@@ -58,11 +62,19 @@ init_shm_worker_relation_cache(void)
 	relation_cache = DiskquotaShmemInitHash("relation_cache", diskquota_max_active_tables, diskquota_max_active_tables,
 	                                        &ctl, HASH_ELEM, DISKQUOTA_OID_HASH);
 
+#ifdef USE_ASSERT_CHECKING
+	pg_atomic_sub_fetch_u32(diskquota_shmem_size, hash_estimate_size(diskquota_max_active_tables, sizeof(DiskQuotaRelationCacheEntry)));
+#endif
+
 	memset(&ctl, 0, sizeof(ctl));
 	ctl.keysize   = sizeof(Oid);
 	ctl.entrysize = sizeof(DiskQuotaRelidCacheEntry);
 	relid_cache = DiskquotaShmemInitHash("relid_cache", diskquota_max_active_tables, diskquota_max_active_tables, &ctl,
 	                                     HASH_ELEM, DISKQUOTA_OID_HASH);
+
+#ifdef USE_ASSERT_CHECKING
+	pg_atomic_sub_fetch_u32(diskquota_shmem_size, hash_estimate_size(diskquota_max_active_tables, sizeof(DiskQuotaRelidCacheEntry)));
+#endif
 }
 
 Oid
