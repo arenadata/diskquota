@@ -610,8 +610,6 @@ init_disk_quota_model(uint32 id)
 	Assert(pg_atomic_read_u32(diskquota_shmem_size) >= 0);
 #endif
 
-	LWLockAcquire(AddinShmemInitLock, LW_EXCLUSIVE);
-
 	format_name("TableSizeEntrymap", id, &str);
 	memset(&hash_ctl, 0, sizeof(hash_ctl));
 	hash_ctl.keysize   = sizeof(TableSizeEntryKey);
@@ -676,8 +674,6 @@ init_disk_quota_model(uint32 id)
 #endif
 
 	pfree(str.data);
-
-	LWLockRelease(AddinShmemInitLock);
 
 #ifdef USE_ASSERT_CHECKING
 	Assert(pg_atomic_read_u32(diskquota_shmem_size) >= 0);
