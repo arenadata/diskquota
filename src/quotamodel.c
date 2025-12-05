@@ -243,7 +243,7 @@ static bool get_table_size_entry_flag(TableSizeEntry *entry, TableSizeEntryFlag 
 static void reset_table_size_entry_flag(TableSizeEntry *entry, TableSizeEntryFlag flag);
 static void set_table_size_entry_flag(TableSizeEntry *entry, TableSizeEntryFlag flag);
 
-static Size diskquota_worker_shmem_size();
+static Size diskquota_worker_shmem_size(void);
 
 typedef struct
 {
@@ -546,7 +546,7 @@ init_lwlocks(void)
 }
 
 static Size
-diskquota_worker_shmem_size()
+diskquota_worker_shmem_size(void)
 {
 	Size size;
 	size = hash_estimate_size(MAX_NUM_TABLE_SIZE_ENTRIES, sizeof(TableSizeEntry)); // table_size_map
