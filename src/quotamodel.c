@@ -243,6 +243,8 @@ static bool get_table_size_entry_flag(TableSizeEntry *entry, TableSizeEntryFlag 
 static void reset_table_size_entry_flag(TableSizeEntry *entry, TableSizeEntryFlag flag);
 static void set_table_size_entry_flag(TableSizeEntry *entry, TableSizeEntryFlag flag);
 
+static Size diskquota_worker_shmem_size();
+
 typedef struct
 {
 	ArrayBuildState *tableids;
@@ -451,7 +453,7 @@ disk_quota_shmem_startup(void)
 
 #ifdef USE_ASSERT_CHECKING
 	diskquota_shmem_size = ShmemInitStruct("diskquota_shmem_size", sizeof(pg_atomic_uint32), &found);
-	if (!found) pg_atomic_init_u32(diskquota_shmem_size, DiskQuotaShmemSize());
+	if (!found) pg_atomic_init_u32(diskquota_shmem_size, DiskQuotaShmemSize() - sizeof(pg_atomic_uint32));
 	if (found) elog(WARNING, "diskquota_shmem_size found!");
 #endif
 
@@ -505,6 +507,11 @@ disk_quota_shmem_startup(void)
 
 #ifdef USE_ASSERT_CHECKING
 	elog(WARNING, "diskquota_shmem_size = %i", pg_atomic_read_u32(diskquota_shmem_size));
+	if (IS_QUERY_DISPATCHER())
+		Assert(pg_atomic_read_u32(diskquota_shmem_size) ==
+		       diskquota_worker_shmem_size() * diskquota_max_monitored_databases);
+	else
+		Assert(pg_atomic_read_u32(diskquota_shmem_size) == 0);
 #endif
 }
 
@@ -608,6 +615,7 @@ init_disk_quota_model(uint32 id)
 
 #ifdef USE_ASSERT_CHECKING
 	elog(WARNING, "diskquota_shmem_size = %i", pg_atomic_read_u32(diskquota_shmem_size));
+	Assert(pg_atomic_read_u32(diskquota_shmem_size) >= 0);
 #endif
 
 	LWLockAcquire(AddinShmemInitLock, LW_EXCLUSIVE);
@@ -684,6 +692,7 @@ init_disk_quota_model(uint32 id)
 
 #ifdef USE_ASSERT_CHECKING
 	elog(WARNING, "diskquota_shmem_size = %i", pg_atomic_read_u32(diskquota_shmem_size));
+	Assert(pg_atomic_read_u32(diskquota_shmem_size) >= 0);
 #endif
 }
 
