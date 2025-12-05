@@ -63,7 +63,8 @@ init_shm_worker_relation_cache(void)
 	                                        &ctl, HASH_ELEM, DISKQUOTA_OID_HASH);
 
 #ifdef USE_ASSERT_CHECKING
-	pg_atomic_sub_fetch_u32(diskquota_shmem_size, hash_estimate_size(diskquota_max_active_tables, sizeof(DiskQuotaRelationCacheEntry)));
+	pg_atomic_sub_fetch_u32(diskquota_shmem_size,
+	                        hash_estimate_size(diskquota_max_active_tables, sizeof(DiskQuotaRelationCacheEntry)));
 #endif
 
 	memset(&ctl, 0, sizeof(ctl));
@@ -73,7 +74,8 @@ init_shm_worker_relation_cache(void)
 	                                     HASH_ELEM, DISKQUOTA_OID_HASH);
 
 #ifdef USE_ASSERT_CHECKING
-	pg_atomic_sub_fetch_u32(diskquota_shmem_size, hash_estimate_size(diskquota_max_active_tables, sizeof(DiskQuotaRelidCacheEntry)));
+	pg_atomic_sub_fetch_u32(diskquota_shmem_size,
+	                        hash_estimate_size(diskquota_max_active_tables, sizeof(DiskQuotaRelidCacheEntry)));
 #endif
 }
 

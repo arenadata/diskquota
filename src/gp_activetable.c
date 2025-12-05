@@ -119,7 +119,8 @@ init_shm_worker_active_tables(void)
 	                                           diskquota_max_active_tables, &ctl, HASH_ELEM, DISKQUOTA_TAG_HASH);
 
 #ifdef USE_ASSERT_CHECKING
-	pg_atomic_sub_fetch_u32(diskquota_shmem_size, hash_estimate_size(diskquota_max_active_tables, sizeof(DiskQuotaActiveTableFileEntry)));
+	pg_atomic_sub_fetch_u32(diskquota_shmem_size,
+	                        hash_estimate_size(diskquota_max_active_tables, sizeof(DiskQuotaActiveTableFileEntry)));
 #endif
 
 	memset(&ctl, 0, sizeof(ctl));
