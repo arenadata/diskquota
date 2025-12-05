@@ -106,7 +106,7 @@ static DiskquotaLauncherShmemStruct *DiskquotaLauncherShmem;
 BackgroundWorkerHandle **bgworker_handles;
 
 #ifdef USE_ASSERT_CHECKING
-extern pg_atomic_uint32 *diskquota_shmem_size;
+extern pg_atomic_uint64 *diskquota_shmem_size;
 #endif
 
 typedef enum
@@ -1740,7 +1740,7 @@ init_launcher_shmem()
 	                                                                         diskquota_launcher_shmem_size(), &found);
 
 #ifdef USE_ASSERT_CHECKING
-	if (!found) pg_atomic_sub_fetch_u32(diskquota_shmem_size, diskquota_launcher_shmem_size());
+	if (!found) pg_atomic_sub_fetch_u64(diskquota_shmem_size, diskquota_launcher_shmem_size());
 #endif
 
 	memset(DiskquotaLauncherShmem, 0, diskquota_launcher_shmem_size());
