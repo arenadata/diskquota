@@ -1741,7 +1741,6 @@ init_launcher_shmem()
 
 #ifdef USE_ASSERT_CHECKING
 	if (!found) pg_atomic_sub_fetch_u32(diskquota_shmem_size, diskquota_launcher_shmem_size());
-	if (found) elog(WARNING, "DiskquotaLauncherShmem found!");
 #endif
 
 	memset(DiskquotaLauncherShmem, 0, diskquota_launcher_shmem_size());

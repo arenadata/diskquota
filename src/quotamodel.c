@@ -445,16 +445,11 @@ disk_quota_shmem_startup(void)
 
 	if (prev_shmem_startup_hook) (*prev_shmem_startup_hook)();
 
-#ifdef USE_ASSERT_CHECKING
-	elog(WARNING, "diskquota_shmem_size = %li", DiskQuotaShmemSize());
-#endif
-
 	LWLockAcquire(AddinShmemInitLock, LW_EXCLUSIVE);
 
 #ifdef USE_ASSERT_CHECKING
 	diskquota_shmem_size = ShmemInitStruct("diskquota_shmem_size", sizeof(pg_atomic_uint32), &found);
 	if (!found) pg_atomic_init_u32(diskquota_shmem_size, DiskQuotaShmemSize() - sizeof(pg_atomic_uint32));
-	if (found) elog(WARNING, "diskquota_shmem_size found!");
 #endif
 
 	init_lwlocks();
@@ -470,7 +465,6 @@ disk_quota_shmem_startup(void)
 
 #ifdef USE_ASSERT_CHECKING
 	if (!found) pg_atomic_sub_fetch_u32(diskquota_shmem_size, sizeof(ExtensionDDLMessage));
-	if (found) elog(WARNING, "extension_ddl_message found!");
 #endif
 
 	memset(&hash_ctl, 0, sizeof(hash_ctl));
@@ -506,7 +500,6 @@ disk_quota_shmem_startup(void)
 	LWLockRelease(AddinShmemInitLock);
 
 #ifdef USE_ASSERT_CHECKING
-	elog(WARNING, "diskquota_shmem_size = %i", pg_atomic_read_u32(diskquota_shmem_size));
 	if (IS_QUERY_DISPATCHER())
 		Assert(pg_atomic_read_u32(diskquota_shmem_size) ==
 		       diskquota_worker_shmem_size() * diskquota_max_monitored_databases);
@@ -614,7 +607,6 @@ init_disk_quota_model(uint32 id)
 	initStringInfo(&str);
 
 #ifdef USE_ASSERT_CHECKING
-	elog(WARNING, "diskquota_shmem_size = %i", pg_atomic_read_u32(diskquota_shmem_size));
 	Assert(pg_atomic_read_u32(diskquota_shmem_size) >= 0);
 #endif
 
@@ -638,7 +630,6 @@ init_disk_quota_model(uint32 id)
 
 #ifdef USE_ASSERT_CHECKING
 	if (!found) pg_atomic_sub_fetch_u32(diskquota_shmem_size, sizeof(TimestampTz));
-	if (found) elog(WARNING, "table_size_map_last_overflow_report found!");
 #endif
 
 	/* for localrejectmap */
@@ -662,7 +653,6 @@ init_disk_quota_model(uint32 id)
 
 #ifdef USE_ASSERT_CHECKING
 	if (!found) pg_atomic_sub_fetch_u32(diskquota_shmem_size, sizeof(TimestampTz));
-	if (found) elog(WARNING, "local_disk_quota_reject_map_last_overflow_report found!");
 #endif
 
 	/* for quota_info_map */
@@ -683,7 +673,6 @@ init_disk_quota_model(uint32 id)
 
 #ifdef USE_ASSERT_CHECKING
 	if (!found) pg_atomic_sub_fetch_u32(diskquota_shmem_size, sizeof(TimestampTz));
-	if (found) elog(WARNING, "quota_info_map_last_overflow_report found!");
 #endif
 
 	pfree(str.data);
@@ -691,7 +680,6 @@ init_disk_quota_model(uint32 id)
 	LWLockRelease(AddinShmemInitLock);
 
 #ifdef USE_ASSERT_CHECKING
-	elog(WARNING, "diskquota_shmem_size = %i", pg_atomic_read_u32(diskquota_shmem_size));
 	Assert(pg_atomic_read_u32(diskquota_shmem_size) >= 0);
 #endif
 }
