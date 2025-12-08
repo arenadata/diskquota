@@ -114,6 +114,10 @@ static float4 get_per_segment_ratio(Oid spcoid);
 static bool   to_delete_quota(QuotaType type, int64 quota_limit_mb, float4 segratio);
 static void   check_role(Oid roleoid, char *rolname, int64 quota_limit_mb);
 
+#ifdef USE_ASSERT_CHECKING
+extern pg_atomic_uint64 *diskquota_shmem_size;
+#endif
+
 /* ---- Help Functions to set quota limit. ---- */
 /*
  * Initialize table diskquota.table_size.
@@ -1634,6 +1638,15 @@ diskquota_hash_create(const char *tabname, long nelem, HASHCTL *info, int flags,
 #endif /* GP_VERSION_NUM */
 }
 
+void *
+DiskquotaShmemInitStruct(const char *name, Size size, bool *foundPtr)
+{
+#ifdef USE_ASSERT_CHECKING
+	pg_atomic_sub_fetch_u64(diskquota_shmem_size, size);
+#endif
+	return ShmemInitStruct(name, size, foundPtr);
+}
+
 HTAB *
 DiskquotaShmemInitHash(const char           *name,       /* table string name for shmem index */
                        long                  init_size,  /* initial table size */
@@ -1642,6 +1655,10 @@ DiskquotaShmemInitHash(const char           *name,       /* table string name fo
                        int                   hash_flags, /* info about infoP */
                        DiskquotaHashFunction hashFunction)
 {
+#ifdef USE_ASSERT_CHECKING
+	pg_atomic_sub_fetch_u64(diskquota_shmem_size,
+	                        hash_estimate_size(max_size, infoP->entrysize));
+#endif
 #if GP_VERSION_NUM < 70000
 	if (hashFunction == DISKQUOTA_TAG_HASH)
 		infoP->hash = tag_hash;

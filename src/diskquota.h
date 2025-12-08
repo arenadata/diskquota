@@ -314,6 +314,7 @@ extern void         diskquota_stop_worker(void);
 extern void         update_monitordb_status(Oid dbid, uint32 status);
 extern HTAB        *diskquota_hash_create(const char *tabname, long nelem, HASHCTL *info, int flags,
                                           DiskquotaHashFunction hashFunction);
+extern void *DiskquotaShmemInitStruct(const char *name, Size size, bool *foundPtr);
 extern HTAB *DiskquotaShmemInitHash(const char *name, long init_size, long max_size, HASHCTL *infoP, int hash_flags,
                                     DiskquotaHashFunction hash_function);
 extern void  refresh_monitored_dbid_cache(void);
