@@ -449,7 +449,15 @@ disk_quota_shmem_startup(void)
 
 #ifdef USE_ASSERT_CHECKING
 	diskquota_shmem_size = ShmemInitStruct("diskquota_shmem_size", sizeof(pg_atomic_uint64), &found);
-	if (!found) pg_atomic_init_u64(diskquota_shmem_size, DiskQuotaShmemSize() - sizeof(pg_atomic_uint64));
+	if (!found)
+	{
+		pg_atomic_init_u64(diskquota_shmem_size, DiskQuotaShmemSize());
+		pg_atomic_sub_fetch_u64(diskquota_shmem_size, sizeof(pg_atomic_uint64));    // diskquota_shmem_size
+		pg_atomic_sub_fetch_u64(diskquota_shmem_size, sizeof(ExtensionDDLMessage)); // extension_ddl_message
+
+		if (IS_QUERY_DISPATCHER())
+			pg_atomic_sub_fetch_u64(diskquota_shmem_size, diskquota_launcher_shmem_size()); // DiskquotaLauncherShmem
+	}
 #endif
 
 	init_lwlocks();
@@ -460,8 +468,7 @@ disk_quota_shmem_startup(void)
 	 * to store out-of-quota rejectmap. active_tables_map is used to store
 	 * active tables whose disk usage is changed.
 	 */
-	extension_ddl_message =
-	        DiskquotaShmemInitStruct("disk_quota_extension_ddl_message", sizeof(ExtensionDDLMessage), &found);
+	extension_ddl_message = ShmemInitStruct("disk_quota_extension_ddl_message", sizeof(ExtensionDDLMessage), &found);
 	if (!found) memset((void *)extension_ddl_message, 0, sizeof(ExtensionDDLMessage));
 	memset(&hash_ctl, 0, sizeof(hash_ctl));
 	hash_ctl.keysize   = sizeof(RejectMapEntry);
@@ -604,7 +611,7 @@ init_disk_quota_model(uint32 id)
 	                                            &hash_ctl, HASH_ELEM, DISKQUOTA_TAG_HASH);
 
 	format_name("TableSizeEntrymap_last_overflow_report", id, &str);
-	table_size_map_last_overflow_report = DiskquotaShmemInitStruct(str.data, sizeof(TimestampTz), &found);
+	table_size_map_last_overflow_report = ShmemInitStruct(str.data, sizeof(TimestampTz), &found);
 	if (!found) *table_size_map_last_overflow_report = 0;
 
 	/* for localrejectmap */
@@ -618,7 +625,7 @@ init_disk_quota_model(uint32 id)
 	                               &hash_ctl, HASH_ELEM, DISKQUOTA_TAG_HASH);
 
 	format_name("localrejectmap_last_overflow_report", id, &str);
-	local_disk_quota_reject_map_last_overflow_report = DiskquotaShmemInitStruct(str.data, sizeof(TimestampTz), &found);
+	local_disk_quota_reject_map_last_overflow_report = ShmemInitStruct(str.data, sizeof(TimestampTz), &found);
 	if (!found) *local_disk_quota_reject_map_last_overflow_report = 0;
 
 	/* for quota_info_map */
@@ -630,7 +637,7 @@ init_disk_quota_model(uint32 id)
 	                                            HASH_ELEM, DISKQUOTA_TAG_HASH);
 
 	format_name("QuotaInfoMap_last_overflow_report", id, &str);
-	quota_info_map_last_overflow_report = DiskquotaShmemInitStruct(str.data, sizeof(TimestampTz), &found);
+	quota_info_map_last_overflow_report = ShmemInitStruct(str.data, sizeof(TimestampTz), &found);
 	if (!found) *quota_info_map_last_overflow_report = 0;
 
 	pfree(str.data);

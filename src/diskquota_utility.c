@@ -1638,15 +1638,6 @@ diskquota_hash_create(const char *tabname, long nelem, HASHCTL *info, int flags,
 #endif /* GP_VERSION_NUM */
 }
 
-void *
-DiskquotaShmemInitStruct(const char *name, Size size, bool *foundPtr)
-{
-#ifdef USE_ASSERT_CHECKING
-	pg_atomic_sub_fetch_u64(diskquota_shmem_size, size);
-#endif
-	return ShmemInitStruct(name, size, foundPtr);
-}
-
 HTAB *
 DiskquotaShmemInitHash(const char           *name,       /* table string name for shmem index */
                        long                  init_size,  /* initial table size */
