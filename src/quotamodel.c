@@ -210,6 +210,8 @@ static const char *local_disk_quota_reject_map_warning =
 
 static shmem_startup_hook_type prev_shmem_startup_hook = NULL;
 
+extern DiskquotaLauncherShmemStruct *DiskquotaLauncherShmem;
+
 #ifdef USE_ASSERT_CHECKING
 pg_atomic_uint64 *diskquota_shmem_size;
 #endif
@@ -599,7 +601,9 @@ init_disk_quota_model(uint32 id)
 	initStringInfo(&str);
 
 #ifdef USE_ASSERT_CHECKING
-	Assert(pg_atomic_read_u64(diskquota_shmem_size) >= 0);
+	Assert(DiskquotaLauncherShmem);
+
+	if (!DiskquotaLauncherShmem->isDynamicWorker) Assert(pg_atomic_read_u64(diskquota_shmem_size) >= 0);
 #endif
 
 	format_name("TableSizeEntrymap", id, &str);
@@ -650,7 +654,7 @@ init_disk_quota_model(uint32 id)
 	pfree(str.data);
 
 #ifdef USE_ASSERT_CHECKING
-	Assert(pg_atomic_read_u64(diskquota_shmem_size) >= 0);
+	if (!DiskquotaLauncherShmem->isDynamicWorker) Assert(pg_atomic_read_u64(diskquota_shmem_size) >= 0);
 #endif
 }
 

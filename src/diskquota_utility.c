@@ -114,6 +114,8 @@ static float4 get_per_segment_ratio(Oid spcoid);
 static bool   to_delete_quota(QuotaType type, int64 quota_limit_mb, float4 segratio);
 static void   check_role(Oid roleoid, char *rolname, int64 quota_limit_mb);
 
+extern DiskquotaLauncherShmemStruct *DiskquotaLauncherShmem;
+
 #ifdef USE_ASSERT_CHECKING
 extern pg_atomic_uint64 *diskquota_shmem_size;
 #endif
@@ -1647,7 +1649,8 @@ DiskquotaShmemInitHash(const char           *name,       /* table string name fo
                        DiskquotaHashFunction hashFunction)
 {
 #ifdef USE_ASSERT_CHECKING
-	pg_atomic_sub_fetch_u64(diskquota_shmem_size, hash_estimate_size(max_size, infoP->entrysize));
+	if (!DiskquotaLauncherShmem || !DiskquotaLauncherShmem->isDynamicWorker)
+		pg_atomic_sub_fetch_u64(diskquota_shmem_size, hash_estimate_size(max_size, infoP->entrysize));
 #endif
 #if GP_VERSION_NUM < 70000
 	if (hashFunction == DISKQUOTA_TAG_HASH)

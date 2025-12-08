@@ -86,12 +86,12 @@ ExtensionDDLMessage *extension_ddl_message = NULL;
 
 // Only access in diskquota worker, different from each worker.
 // a pointer to DiskquotaLauncherShmem->workerEntries in shared memory
-static DiskQuotaWorkerEntry *volatile MyWorkerInfo = NULL;
+DiskQuotaWorkerEntry *volatile MyWorkerInfo = NULL;
 
 // how many database diskquota are monitoring on
 static int num_db = 0;
 
-static DiskquotaLauncherShmemStruct *DiskquotaLauncherShmem;
+DiskquotaLauncherShmemStruct *DiskquotaLauncherShmem = NULL;
 
 #define MIN_SLEEPTIME 100         /* milliseconds */
 #define BGWORKER_LOG_TIME 3600000 /* milliseconds */
