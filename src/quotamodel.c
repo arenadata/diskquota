@@ -608,7 +608,6 @@ init_disk_quota_model(uint32 id)
 	hash_ctl.entrysize = sizeof(TableSizeEntry);
 	table_size_map     = DiskquotaShmemInitHash(str.data, INIT_NUM_TABLE_SIZE_ENTRIES, MAX_NUM_TABLE_SIZE_ENTRIES,
 	                                            &hash_ctl, HASH_ELEM, DISKQUOTA_TAG_HASH);
-
 	format_name("TableSizeEntrymap_last_overflow_report", id, &str);
 	table_size_map_last_overflow_report = ShmemInitStruct(str.data, sizeof(TimestampTz), &found);
 	if (!found) *table_size_map_last_overflow_report = 0;
@@ -634,7 +633,6 @@ init_disk_quota_model(uint32 id)
 	hash_ctl.keysize   = sizeof(QuotaInfoEntryKey);
 	quota_info_map     = DiskquotaShmemInitHash(str.data, INIT_QUOTA_MAP_ENTRIES, MAX_QUOTA_MAP_ENTRIES, &hash_ctl,
 	                                            HASH_ELEM, DISKQUOTA_TAG_HASH);
-
 	format_name("QuotaInfoMap_last_overflow_report", id, &str);
 	quota_info_map_last_overflow_report = ShmemInitStruct(str.data, sizeof(TimestampTz), &found);
 	if (!found) *quota_info_map_last_overflow_report = 0;
