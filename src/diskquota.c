@@ -1734,7 +1734,6 @@ init_launcher_shmem()
 	bool found;
 	DiskquotaLauncherShmem = (DiskquotaLauncherShmemStruct *)ShmemInitStruct("Diskquota launcher Data",
 	                                                                         diskquota_launcher_shmem_size(), &found);
-
 	memset(DiskquotaLauncherShmem, 0, diskquota_launcher_shmem_size());
 	if (!found)
 	{
