@@ -86,7 +86,7 @@ ExtensionDDLMessage *extension_ddl_message = NULL;
 
 // Only access in diskquota worker, different from each worker.
 // a pointer to DiskquotaLauncherShmem->workerEntries in shared memory
-DiskQuotaWorkerEntry *volatile MyWorkerInfo = NULL;
+static DiskQuotaWorkerEntry *volatile MyWorkerInfo = NULL;
 
 // how many database diskquota are monitoring on
 static int num_db = 0;
