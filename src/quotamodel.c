@@ -472,6 +472,7 @@ disk_quota_shmem_startup(void)
 	 */
 	extension_ddl_message = ShmemInitStruct("disk_quota_extension_ddl_message", sizeof(ExtensionDDLMessage), &found);
 	if (!found) memset((void *)extension_ddl_message, 0, sizeof(ExtensionDDLMessage));
+
 	memset(&hash_ctl, 0, sizeof(hash_ctl));
 	hash_ctl.keysize   = sizeof(RejectMapEntry);
 	hash_ctl.entrysize = sizeof(GlobalRejectMapEntry);
