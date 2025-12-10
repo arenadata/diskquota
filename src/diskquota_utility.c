@@ -1665,15 +1665,10 @@ DiskquotaShmemInitHash(const char           *name,       /* table string name fo
 #endif /* GP_VERSION_NUM */
 }
 
-/*
- * Returns HASH_FIND if hash table is full and HASH_ENTER otherwise.
- * It can be used only under lock.
- */
 HASHACTION
-check_hash_fullness(HTAB *hashp, int max_size, const char *warning_message, TimestampTz *last_overflow_report)
+check_hash_fullness_num(HTAB *hashp, int num_entries, int max_size, const char *warning_message,
+                        TimestampTz *last_overflow_report)
 {
-	long num_entries = hash_get_num_entries(hashp);
-
 	if (num_entries < max_size) return HASH_ENTER;
 
 	if (num_entries == max_size)
@@ -1691,27 +1686,14 @@ check_hash_fullness(HTAB *hashp, int max_size, const char *warning_message, Time
 	return HASH_FIND;
 }
 
+/*
+ * Returns HASH_FIND if hash table is full and HASH_ENTER otherwise.
+ * It can be used only under lock.
+ */
 HASHACTION
-check_hash_fullness_num(HTAB *hashp, pg_atomic_uint32 *counter, int max_size, const char *warning_message,
-                        TimestampTz *last_overflow_report)
+check_hash_fullness(HTAB *hashp, int max_size, const char *warning_message, TimestampTz *last_overflow_report)
 {
-	uint32 num_entries = pg_atomic_read_u32(counter);
-
-	if (num_entries < max_size) return HASH_ENTER;
-
-	if (num_entries == max_size)
-	{
-		TimestampTz current_time = GetCurrentTimestamp();
-
-		if (*last_overflow_report == 0 || TimestampDifferenceExceeds(*last_overflow_report, current_time,
-		                                                             diskquota_hashmap_overflow_report_timeout * 1000))
-		{
-			ereport(WARNING, (errmsg("[diskquota] %s", warning_message)));
-			*last_overflow_report = current_time;
-		}
-	}
-
-	return HASH_FIND;
+	return check_hash_fullness_num(hashp, hash_get_num_entries(hashp), max_size, warning_message, last_overflow_report);
 }
 
 bool

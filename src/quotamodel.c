@@ -275,7 +275,7 @@ update_size_for_quota(int64 size, QuotaType type, Oid *keys, int16 segid)
 	memcpy(key.keys, keys, quota_key_num[type] * sizeof(Oid));
 	key.type  = type;
 	key.segid = segid;
-	action    = check_hash_fullness_num(quota_info_map, diskquota_quota_info_entry_num, diskquota_max_quota_probes,
+	action    = check_hash_fullness_num(quota_info_map, pg_atomic_read_u32(diskquota_quota_info_entry_num), diskquota_max_quota_probes,
 	                                    quota_info_map_warning, quota_info_map_last_overflow_report);
 	entry     = hash_search(quota_info_map, &key, action, &found);
 	/* If the number of quota exceeds the limit, entry will be NULL */
@@ -303,7 +303,7 @@ update_limit_for_quota(int64 limit, float segratio, QuotaType type, Oid *keys)
 		memcpy(key.keys, keys, quota_key_num[type] * sizeof(Oid));
 		key.type  = type;
 		key.segid = i;
-		action    = check_hash_fullness_num(quota_info_map, diskquota_quota_info_entry_num, diskquota_max_quota_probes,
+		action    = check_hash_fullness_num(quota_info_map, pg_atomic_read_u32(diskquota_quota_info_entry_num), diskquota_max_quota_probes,
 		                                    quota_info_map_warning, quota_info_map_last_overflow_report);
 		entry     = hash_search(quota_info_map, &key, action, &found);
 		/* If the number of quota exceeds the limit, entry will be NULL */
@@ -982,7 +982,7 @@ get_table_size_map_entry(Oid oid, int16 segid)
 	bool              found;
 	TableSizeEntryKey key = {.reloid = oid, .id = TableSizeEntryId(segid)};
 	HASHACTION        action =
-	        check_hash_fullness_num(table_size_map, diskquota_table_size_entry_num, MAX_NUM_TABLE_SIZE_ENTRIES,
+	        check_hash_fullness_num(table_size_map, pg_atomic_read_u32(diskquota_table_size_entry_num), MAX_NUM_TABLE_SIZE_ENTRIES,
 	                                table_size_map_warning, table_size_map_last_overflow_report);
 	TableSizeEntry *tsentry = hash_search(table_size_map, &key, action, &found);
 

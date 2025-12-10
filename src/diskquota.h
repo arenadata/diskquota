@@ -317,10 +317,10 @@ extern HTAB        *diskquota_hash_create(const char *tabname, long nelem, HASHC
 extern HTAB *DiskquotaShmemInitHash(const char *name, long init_size, long max_size, HASHCTL *infoP, int hash_flags,
                                     DiskquotaHashFunction hash_function);
 extern void  refresh_monitored_dbid_cache(void);
+extern HASHACTION check_hash_fullness_num(HTAB *hashp, int num_entries, int max_size,
+                                          const char *warning_message, TimestampTz *last_overflow_report);
 extern HASHACTION check_hash_fullness(HTAB *hashp, int max_size, const char *warning_message,
                                       TimestampTz *last_overflow_report);
-extern HASHACTION check_hash_fullness_num(HTAB *hashp, pg_atomic_uint32 *counter, int max_size,
-                                          const char *warning_message, TimestampTz *last_overflow_report);
 bool              SPI_push_cond_and_connect(void);
 void              SPI_finish_and_pop_cond(bool pushed);
 #endif
