@@ -213,6 +213,12 @@ static const char *local_disk_quota_reject_map_warning =
 
 static shmem_startup_hook_type prev_shmem_startup_hook = NULL;
 
+extern DiskquotaLauncherShmemStruct *DiskquotaLauncherShmem;
+
+#ifdef USE_ASSERT_CHECKING
+pg_atomic_uint64 *diskquota_shmem_size;
+#endif
+
 /* functions to maintain the quota maps */
 static void update_size_for_quota(int64 size, QuotaType type, Oid *keys, int16 segid);
 static void update_limit_for_quota(int64 limit, float segratio, QuotaType type, Oid *keys);
@@ -241,6 +247,8 @@ static void format_name(const char *prefix, uint32 id, StringInfo str);
 static bool get_table_size_entry_flag(TableSizeEntry *entry, TableSizeEntryFlag flag);
 static void reset_table_size_entry_flag(TableSizeEntry *entry, TableSizeEntryFlag flag);
 static void set_table_size_entry_flag(TableSizeEntry *entry, TableSizeEntryFlag flag);
+
+static Size diskquota_worker_shmem_size(void);
 
 typedef struct
 {
@@ -445,6 +453,19 @@ disk_quota_shmem_startup(void)
 
 	LWLockAcquire(AddinShmemInitLock, LW_EXCLUSIVE);
 
+#ifdef USE_ASSERT_CHECKING
+	diskquota_shmem_size = ShmemInitStruct("diskquota_shmem_size", sizeof(pg_atomic_uint64), &found);
+	if (!found)
+	{
+		pg_atomic_init_u64(diskquota_shmem_size, DiskQuotaShmemSize());
+		pg_atomic_sub_fetch_u64(diskquota_shmem_size, sizeof(pg_atomic_uint64));    // diskquota_shmem_size
+		pg_atomic_sub_fetch_u64(diskquota_shmem_size, sizeof(ExtensionDDLMessage)); // extension_ddl_message
+
+		if (IS_QUERY_DISPATCHER())
+			pg_atomic_sub_fetch_u64(diskquota_shmem_size, diskquota_launcher_shmem_size()); // DiskquotaLauncherShmem
+	}
+#endif
+
 	init_lwlocks();
 
 	/*
@@ -474,8 +495,16 @@ disk_quota_shmem_startup(void)
 	monitored_dbid_cache =
 	        DiskquotaShmemInitHash("table oid cache which shoud tracking", diskquota_max_monitored_databases,
 	                               diskquota_max_monitored_databases, &hash_ctl, HASH_ELEM, DISKQUOTA_OID_HASH);
-	init_launcher_shmem();
+	if (IS_QUERY_DISPATCHER()) init_launcher_shmem();
 	LWLockRelease(AddinShmemInitLock);
+
+#ifdef USE_ASSERT_CHECKING
+	if (IS_QUERY_DISPATCHER())
+		Assert(pg_atomic_read_u64(diskquota_shmem_size) ==
+		       diskquota_worker_shmem_size() * diskquota_max_monitored_databases);
+	else
+		Assert(pg_atomic_read_u64(diskquota_shmem_size) == 0);
+#endif
 }
 
 /*
@@ -516,13 +545,13 @@ init_lwlocks(void)
 }
 
 static Size
-diskquota_worker_shmem_size()
+diskquota_worker_shmem_size(void)
 {
 	Size size;
-	size = hash_estimate_size(MAX_NUM_TABLE_SIZE_ENTRIES / diskquota_max_monitored_databases + 100,
-	                          sizeof(TableSizeEntry));
-	size = add_size(size, hash_estimate_size(diskquota_max_local_reject_entries, sizeof(LocalRejectMapEntry)));
-	size = add_size(size, hash_estimate_size(MAX_QUOTA_MAP_ENTRIES, sizeof(QuotaInfoEntry)));
+	size = hash_estimate_size(MAX_NUM_TABLE_SIZE_ENTRIES, sizeof(TableSizeEntry)); // table_size_map
+	size = add_size(size, hash_estimate_size(diskquota_max_local_reject_entries,
+	                                         sizeof(LocalRejectMapEntry))); // local_disk_quota_reject_map
+	size = add_size(size, hash_estimate_size(MAX_QUOTA_MAP_ENTRIES, sizeof(QuotaInfoEntry))); // quota_info_map
 	size = add_size(size, sizeof(TimestampTz)); // table_size_map_last_overflow_report
 	size = add_size(size, sizeof(TimestampTz)); // local_disk_quota_reject_map_last_overflow_report
 	size = add_size(size, sizeof(TimestampTz)); // quota_info_map_last_overflow_report
@@ -537,19 +566,29 @@ static Size
 DiskQuotaShmemSize(void)
 {
 	Size size;
-	size = sizeof(ExtensionDDLMessage);
-	size = add_size(size, hash_estimate_size(MAX_DISK_QUOTA_REJECT_ENTRIES, sizeof(GlobalRejectMapEntry)));
-	size = add_size(size, hash_estimate_size(diskquota_max_active_tables, sizeof(DiskQuotaActiveTableEntry)));
-	size = add_size(size, hash_estimate_size(diskquota_max_active_tables, sizeof(DiskQuotaRelationCacheEntry)));
-	size = add_size(size, hash_estimate_size(diskquota_max_active_tables, sizeof(DiskQuotaRelidCacheEntry)));
-	size = add_size(size, hash_estimate_size(diskquota_max_active_tables, sizeof(Oid)));
+	size = sizeof(ExtensionDDLMessage); // extension_ddl_message
+
+#ifdef USE_ASSERT_CHECKING
+	size = add_size(size, sizeof(pg_atomic_uint64)); // diskquota_shmem_size
+#endif
+
+	size = add_size(size, hash_estimate_size(MAX_DISK_QUOTA_REJECT_ENTRIES,
+	                                         sizeof(GlobalRejectMapEntry))); // disk_quota_reject_map
+	size = add_size(size, hash_estimate_size(diskquota_max_active_tables,
+	                                         sizeof(DiskQuotaActiveTableFileEntry))); // active_tables_map
+	size = add_size(size, hash_estimate_size(diskquota_max_active_tables,
+	                                         sizeof(DiskQuotaRelationCacheEntry))); // relation_cache
+	size = add_size(size,
+	                hash_estimate_size(diskquota_max_active_tables, sizeof(DiskQuotaRelidCacheEntry))); // relid_cache
+	size = add_size(size, hash_estimate_size(diskquota_max_active_tables, sizeof(Oid))); // altered_reloid_cache
 	size = add_size(size, hash_estimate_size(diskquota_max_monitored_databases,
 	                                         sizeof(struct MonitorDBEntryStruct))); // monitored_dbid_cache
 
 	if (IS_QUERY_DISPATCHER())
 	{
-		size = add_size(size, diskquota_launcher_shmem_size());
+		size = add_size(size, diskquota_launcher_shmem_size()); // DiskquotaLauncherShmem
 		size = add_size(size, sizeof(pg_atomic_uint32)); // diskquota_table_size_entry_num
+		size = add_size(size, sizeof(pg_atomic_uint32)); // diskquota_local_disk_quota_reject_entry_num
 		size = add_size(size, sizeof(pg_atomic_uint32)); // diskquota_quota_info_entry_num
 		size = add_size(size, diskquota_worker_shmem_size() * diskquota_max_monitored_databases);
 	}
@@ -569,6 +608,12 @@ init_disk_quota_model(uint32 id)
 	bool           found;
 	initStringInfo(&str);
 
+#ifdef USE_ASSERT_CHECKING
+	Assert(DiskquotaLauncherShmem);
+
+	if (!DiskquotaLauncherShmem->isDynamicWorker) Assert(pg_atomic_read_u64(diskquota_shmem_size) >= 0);
+#endif
+
 	format_name("TableSizeEntrymap", id, &str);
 	memset(&hash_ctl, 0, sizeof(hash_ctl));
 	hash_ctl.keysize   = sizeof(TableSizeEntryKey);
@@ -578,6 +623,16 @@ init_disk_quota_model(uint32 id)
 	format_name("TableSizeEntrymap_last_overflow_report", id, &str);
 	table_size_map_last_overflow_report = ShmemInitStruct(str.data, sizeof(TimestampTz), &found);
 	if (!found) *table_size_map_last_overflow_report = 0;
+
+#ifdef USE_ASSERT_CHECKING
+	if (!found)
+	{
+		pg_atomic_sub_fetch_u64(diskquota_shmem_size, sizeof(TimestampTz)); // table_size_map_last_overflow_report
+		pg_atomic_sub_fetch_u64(diskquota_shmem_size,
+		                        sizeof(TimestampTz)); // local_disk_quota_reject_map_last_overflow_report
+		pg_atomic_sub_fetch_u64(diskquota_shmem_size, sizeof(TimestampTz)); // quota_info_map_last_overflow_report
+	}
+#endif
 
 	/* for localrejectmap */
 	/* WARNNING: The max length of name of the map is 48 */
@@ -605,6 +660,10 @@ init_disk_quota_model(uint32 id)
 	if (!found) *quota_info_map_last_overflow_report = 0;
 
 	pfree(str.data);
+
+#ifdef USE_ASSERT_CHECKING
+	if (!DiskquotaLauncherShmem->isDynamicWorker) Assert(pg_atomic_read_u64(diskquota_shmem_size) >= 0);
+#endif
 }
 
 /*

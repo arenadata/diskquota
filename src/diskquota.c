@@ -91,13 +91,16 @@ static DiskQuotaWorkerEntry *volatile MyWorkerInfo = NULL;
 // how many database diskquota are monitoring on
 static int num_db = 0;
 
-/* how many TableSizeEntry are maintained in all the table_size_map in shared memory*/
+DiskquotaLauncherShmemStruct *DiskquotaLauncherShmem = NULL;
+
+/* how many TableSizeEntry are maintained in all the table_size_map in shared memory */
 pg_atomic_uint32 *diskquota_table_size_entry_num;
 
-/* how many QuotaInfoEntry are maintained in all the quota_info_map in shared memory*/
-pg_atomic_uint32 *diskquota_quota_info_entry_num;
+/* how many LocalRejectMapEntry are maintained in all the local_disk_quota_reject_map in shared memory */
+pg_atomic_uint32 *diskquota_local_disk_quota_reject_entry_num;
 
-static DiskquotaLauncherShmemStruct *DiskquotaLauncherShmem;
+/* how many QuotaInfoEntry are maintained in all the quota_info_map in shared memory */
+pg_atomic_uint32 *diskquota_quota_info_entry_num;
 
 #define MIN_SLEEPTIME 100         /* milliseconds */
 #define BGWORKER_LOG_TIME 3600000 /* milliseconds */
