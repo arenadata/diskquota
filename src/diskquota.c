@@ -96,9 +96,6 @@ DiskquotaLauncherShmemStruct *DiskquotaLauncherShmem = NULL;
 /* how many TableSizeEntry are maintained in all the table_size_map in shared memory */
 pg_atomic_uint32 *diskquota_table_size_entry_num;
 
-/* how many LocalRejectMapEntry are maintained in all the local_disk_quota_reject_map in shared memory */
-pg_atomic_uint32 *diskquota_local_disk_quota_reject_entry_num;
-
 /* how many QuotaInfoEntry are maintained in all the quota_info_map in shared memory */
 pg_atomic_uint32 *diskquota_quota_info_entry_num;
 
