@@ -284,6 +284,7 @@ update_size_for_quota(int64 size, QuotaType type, Oid *keys, int16 segid)
 	{
 		entry->size  = 0;
 		entry->limit = -1;
+		pg_atomic_add_fetch_u32(diskquota_quota_info_entry_num, 1);
 	}
 	entry->size += size;
 }
@@ -310,6 +311,7 @@ update_limit_for_quota(int64 limit, float segratio, QuotaType type, Oid *keys)
 		if (!found)
 		{
 			entry->size = 0;
+			pg_atomic_add_fetch_u32(diskquota_quota_info_entry_num, 1);
 		}
 		if (key.segid == -1)
 			entry->limit = limit;
@@ -995,6 +997,7 @@ get_table_size_map_entry(Oid oid, int16 segid)
 		int seg_st = TableSizeEntrySegidStart(tsentry);
 		int seg_ed = TableSizeEntrySegidEnd(tsentry);
 		for (int j = seg_st; j < seg_ed; j++) TableSizeEntrySetFlushFlag(tsentry, j);
+		pg_atomic_add_fetch_u32(diskquota_table_size_entry_num, 1);
 	}
 
 	return tsentry;

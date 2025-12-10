@@ -1697,11 +1697,7 @@ check_hash_fullness_num(HTAB *hashp, pg_atomic_uint32 *counter, int max_size, co
 {
 	uint32 num_entries = pg_atomic_read_u32(counter);
 
-	if (num_entries < max_size)
-	{
-		(void)pg_atomic_add_fetch_u32(counter, 1);
-		return HASH_ENTER;
-	}
+	if (num_entries < max_size) return HASH_ENTER;
 
 	if (num_entries == max_size)
 	{
