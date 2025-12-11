@@ -114,10 +114,9 @@ static float4 get_per_segment_ratio(Oid spcoid);
 static bool   to_delete_quota(QuotaType type, int64 quota_limit_mb, float4 segratio);
 static void   check_role(Oid roleoid, char *rolname, int64 quota_limit_mb);
 
-extern DiskquotaLauncherShmemStruct *DiskquotaLauncherShmem;
-
 #ifdef USE_ASSERT_CHECKING
-extern pg_atomic_uint64 *diskquota_shmem_size;
+extern DiskquotaLauncherShmemStruct *DiskquotaLauncherShmem;
+extern pg_atomic_uint64             *diskquota_shmem_size;
 #endif
 
 /* ---- Help Functions to set quota limit. ---- */

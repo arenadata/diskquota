@@ -210,10 +210,9 @@ static const char *local_disk_quota_reject_map_warning =
 
 static shmem_startup_hook_type prev_shmem_startup_hook = NULL;
 
-extern DiskquotaLauncherShmemStruct *DiskquotaLauncherShmem;
-
 #ifdef USE_ASSERT_CHECKING
-pg_atomic_uint64 *diskquota_shmem_size;
+extern DiskquotaLauncherShmemStruct *DiskquotaLauncherShmem;
+pg_atomic_uint64                    *diskquota_shmem_size;
 #endif
 
 /* functions to maintain the quota maps */
