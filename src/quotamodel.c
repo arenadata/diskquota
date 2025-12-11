@@ -275,10 +275,10 @@ update_size_for_quota(int64 size, QuotaType type, Oid *keys, int16 segid)
 	memcpy(key.keys, keys, quota_key_num[type] * sizeof(Oid));
 	key.type  = type;
 	key.segid = segid;
-	action    = check_hash_fullness_num(quota_info_map, pg_atomic_read_u32(diskquota_quota_info_entry_num),
-	                                    diskquota_max_quota_probes, quota_info_map_warning,
-	                                    quota_info_map_last_overflow_report);
-	entry     = hash_search(quota_info_map, &key, action, &found);
+	action =
+	        check_hash_fullness_num(quota_info_map, pg_atomic_read_u32(diskquota_quota_info_entry_num),
+	                                MAX_QUOTA_MAP_ENTRIES, quota_info_map_warning, quota_info_map_last_overflow_report);
+	entry = hash_search(quota_info_map, &key, action, &found);
 	/* If the number of quota exceeds the limit, entry will be NULL */
 	if (entry == NULL) return;
 	if (!found)
@@ -305,7 +305,7 @@ update_limit_for_quota(int64 limit, float segratio, QuotaType type, Oid *keys)
 		key.type  = type;
 		key.segid = i;
 		action    = check_hash_fullness_num(quota_info_map, pg_atomic_read_u32(diskquota_quota_info_entry_num),
-		                                    diskquota_max_quota_probes, quota_info_map_warning,
+		                                    MAX_QUOTA_MAP_ENTRIES, quota_info_map_warning,
 		                                    quota_info_map_last_overflow_report);
 		entry     = hash_search(quota_info_map, &key, action, &found);
 		/* If the number of quota exceeds the limit, entry will be NULL */
