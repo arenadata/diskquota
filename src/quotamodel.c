@@ -560,11 +560,11 @@ static Size
 diskquota_worker_shmem_size(void)
 {
 	Size size;
-	size = hash_estimate_size(0, 0); // table_size_map
+	size = hash_estimate_size(INIT_NUM_TABLE_SIZE_ENTRIES, sizeof(TableSizeEntry)); // table_size_map
 	size = add_size(size, hash_estimate_size(diskquota_max_local_reject_entries,
 	                                         sizeof(LocalRejectMapEntry))); // local_disk_quota_reject_map
-	size = add_size(size, hash_estimate_size(0, 0));                        // quota_info_map
-	size = add_size(size, sizeof(TimestampTz));                             // table_size_map_last_overflow_report
+	size = add_size(size, hash_estimate_size(INIT_QUOTA_MAP_ENTRIES, sizeof(QuotaInfoEntry))); // quota_info_map
+	size = add_size(size, sizeof(TimestampTz)); // table_size_map_last_overflow_report
 	size = add_size(size, sizeof(TimestampTz)); // local_disk_quota_reject_map_last_overflow_report
 	size = add_size(size, sizeof(TimestampTz)); // quota_info_map_last_overflow_report
 	return size;
