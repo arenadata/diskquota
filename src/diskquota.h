@@ -42,9 +42,10 @@
 #define MAX_NUM_KEYS_QUOTA_MAP 8
 /* init number of QuotaInfoEntry in quota_info_map */
 #define INIT_QUOTA_MAP_ENTRIES 128
-#define AVG_QUOTA_MAP_ENTRIES (diskquota_max_quota_probes / diskquota_max_monitored_databases)
 /* max number of QuotaInfoEntry in quota_info_map */
-#define MAX_QUOTA_MAP_ENTRIES (AVG_QUOTA_MAP_ENTRIES < 1024 ? 1024 : AVG_QUOTA_MAP_ENTRIES)
+#define MAX_QUOTA_MAP_ENTRIES                                                                                         \
+	(diskquota_max_quota_probes < 1024 * diskquota_max_monitored_databases ? 1024 * diskquota_max_monitored_databases \
+	                                                                       : diskquota_max_quota_probes)
 
 typedef enum
 {
