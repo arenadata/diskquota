@@ -1649,7 +1649,11 @@ DiskquotaShmemInitHash(const char           *name,       /* table string name fo
 {
 #ifdef USE_ASSERT_CHECKING
 	if (!DiskquotaLauncherShmem || !DiskquotaLauncherShmem->isDynamicWorker)
-		pg_atomic_sub_fetch_u64(diskquota_shmem_size, hash_estimate_size(max_size, infoP->entrysize));
+	{
+		Size size = hash_estimate_size(max_size, infoP->entrysize);
+		Assert(pg_atomic_read_u64(diskquota_shmem_size) >= size);
+		pg_atomic_sub_fetch_u64(diskquota_shmem_size, size);
+	}
 #endif
 #if GP_VERSION_NUM < 70000
 	if (hashFunction == DISKQUOTA_TAG_HASH)
