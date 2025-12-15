@@ -77,6 +77,7 @@
 #define DISK_QUOTA_REJECT_MAP_ENTRY_SIZE sizeof(GlobalRejectMapEntry)
 #define TABLE_SIZE_MAP_ENTRY_SIZE sizeof(TableSizeEntry)
 #define LOCAL_DISK_QUOTA_REJECT_MAP_ENTRY_SIZE sizeof(LocalRejectMapEntry)
+#define QUOTA_INFO_MAP_ENTRY_SIZE sizeof(QuotaInfoEntry)
 
 typedef struct TableSizeEntry       TableSizeEntry;
 typedef struct NamespaceSizeEntry   NamespaceSizeEntry;
@@ -552,7 +553,7 @@ diskquota_worker_shmem_size(void)
 	size = hash_estimate_size(MAX_NUM_TABLE_SIZE_ENTRIES, TABLE_SIZE_MAP_ENTRY_SIZE);
 	size = add_size(size,
 	                hash_estimate_size(diskquota_max_local_reject_entries, LOCAL_DISK_QUOTA_REJECT_MAP_ENTRY_SIZE));
-	size = add_size(size, hash_estimate_size(MAX_QUOTA_MAP_ENTRIES, sizeof(QuotaInfoEntry))); // quota_info_map
+	size = add_size(size, hash_estimate_size(MAX_QUOTA_MAP_ENTRIES, QUOTA_INFO_MAP_ENTRY_SIZE));
 	size = add_size(size, TABLE_SIZE_MAP_LAST_OVERFLOW_REPORT_SIZE);
 	size = add_size(size, LOCAL_DISK_QUOTA_REJECT_MAP_LAST_OVERFLOW_REPORT_SIZE);
 	size = add_size(size, QUOTA_INFO_MAP_LAST_OVERFLOW_REPORT_SIZE);
@@ -637,7 +638,7 @@ init_disk_quota_model(uint32 id)
 	/* for quota_info_map */
 	format_name("QuotaInfoMap", id, &str);
 	memset(&hash_ctl, 0, sizeof(hash_ctl));
-	hash_ctl.entrysize = sizeof(QuotaInfoEntry);
+	hash_ctl.entrysize = QUOTA_INFO_MAP_ENTRY_SIZE;
 	hash_ctl.keysize   = sizeof(QuotaInfoEntryKey);
 	quota_info_map     = DiskquotaShmemInitHash(str.data, INIT_QUOTA_MAP_ENTRIES, MAX_QUOTA_MAP_ENTRIES, &hash_ctl,
 	                                            HASH_ELEM, DISKQUOTA_TAG_HASH);
@@ -714,7 +715,7 @@ vacuum_disk_quota_model(uint32 id)
 	/* quota_info_map */
 	format_name("QuotaInfoMap", id, &str);
 	memset(&hash_ctl, 0, sizeof(hash_ctl));
-	hash_ctl.entrysize = sizeof(QuotaInfoEntry);
+	hash_ctl.entrysize = QUOTA_INFO_MAP_ENTRY_SIZE;
 	hash_ctl.keysize   = sizeof(QuotaInfoEntryKey);
 	quota_info_map     = DiskquotaShmemInitHash(str.data, INIT_QUOTA_MAP_ENTRIES, MAX_QUOTA_MAP_ENTRIES, &hash_ctl,
 	                                            HASH_ELEM, DISKQUOTA_TAG_HASH);
