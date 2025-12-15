@@ -75,6 +75,7 @@
 #define LOCAL_DISK_QUOTA_REJECT_MAP_LAST_OVERFLOW_REPORT_SIZE sizeof(TimestampTz)
 #define QUOTA_INFO_MAP_LAST_OVERFLOW_REPORT_SIZE sizeof(TimestampTz)
 #define DISK_QUOTA_REJECT_MAP_ENTRY_SIZE sizeof(GlobalRejectMapEntry)
+#define TABLE_SIZE_MAP_ENTRY_SIZE sizeof(TableSizeEntry)
 
 typedef struct TableSizeEntry       TableSizeEntry;
 typedef struct NamespaceSizeEntry   NamespaceSizeEntry;
@@ -547,7 +548,7 @@ static Size
 diskquota_worker_shmem_size(void)
 {
 	Size size;
-	size = hash_estimate_size(MAX_NUM_TABLE_SIZE_ENTRIES, sizeof(TableSizeEntry)); // table_size_map
+	size = hash_estimate_size(MAX_NUM_TABLE_SIZE_ENTRIES, TABLE_SIZE_MAP_ENTRY_SIZE);
 	size = add_size(size, hash_estimate_size(diskquota_max_local_reject_entries,
 	                                         sizeof(LocalRejectMapEntry))); // local_disk_quota_reject_map
 	size = add_size(size, hash_estimate_size(MAX_QUOTA_MAP_ENTRIES, sizeof(QuotaInfoEntry))); // quota_info_map
@@ -602,7 +603,7 @@ init_disk_quota_model(uint32 id)
 	format_name("TableSizeEntrymap", id, &str);
 	memset(&hash_ctl, 0, sizeof(hash_ctl));
 	hash_ctl.keysize   = sizeof(TableSizeEntryKey);
-	hash_ctl.entrysize = sizeof(TableSizeEntry);
+	hash_ctl.entrysize = TABLE_SIZE_MAP_ENTRY_SIZE;
 	table_size_map     = DiskquotaShmemInitHash(str.data, INIT_NUM_TABLE_SIZE_ENTRIES, MAX_NUM_TABLE_SIZE_ENTRIES,
 	                                            &hash_ctl, HASH_ELEM, DISKQUOTA_TAG_HASH);
 	format_name("TableSizeEntrymap_last_overflow_report", id, &str);
@@ -679,7 +680,7 @@ vacuum_disk_quota_model(uint32 id)
 	format_name("TableSizeEntrymap", id, &str);
 	memset(&hash_ctl, 0, sizeof(hash_ctl));
 	hash_ctl.keysize   = sizeof(TableSizeEntryKey);
-	hash_ctl.entrysize = sizeof(TableSizeEntry);
+	hash_ctl.entrysize = TABLE_SIZE_MAP_ENTRY_SIZE;
 	table_size_map     = DiskquotaShmemInitHash(str.data, INIT_NUM_TABLE_SIZE_ENTRIES, MAX_NUM_TABLE_SIZE_ENTRIES,
 	                                            &hash_ctl, HASH_ELEM, DISKQUOTA_TAG_HASH);
 	hash_seq_init(&iter, table_size_map);
