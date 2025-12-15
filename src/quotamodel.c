@@ -219,11 +219,8 @@ static const char *local_disk_quota_reject_map_warning =
 static shmem_startup_hook_type prev_shmem_startup_hook = NULL;
 
 #ifdef USE_ASSERT_CHECKING
-extern DiskquotaLauncherShmemStruct *DiskquotaLauncherShmem;
-pg_atomic_uint64                    *diskquota_shmem_size;
-void                                 diskquota_shmem_size_sub(Size size);
-#else
-#define diskquota_shmem_size_sub(size) ((void)true)
+static pg_atomic_uint64 *diskquota_shmem_size;
+void                     diskquota_shmem_size_sub(Size size);
 #endif
 
 /* functions to maintain the quota maps */
@@ -465,9 +462,6 @@ disk_quota_shmem_startup(void)
 	{
 		pg_atomic_init_u64(diskquota_shmem_size, DiskQuotaShmemSize());
 		diskquota_shmem_size_sub(sizeof(pg_atomic_uint64)); // diskquota_shmem_size
-		diskquota_shmem_size_sub(EXTENSION_DDL_MESSAGE_SIZE);
-
-		if (IS_QUERY_DISPATCHER()) diskquota_shmem_size_sub(diskquota_launcher_shmem_size()); // DiskquotaLauncherShmem
 	}
 #endif
 
@@ -479,7 +473,8 @@ disk_quota_shmem_startup(void)
 	 * to store out-of-quota rejectmap. active_tables_map is used to store
 	 * active tables whose disk usage is changed.
 	 */
-	extension_ddl_message = ShmemInitStruct("disk_quota_extension_ddl_message", EXTENSION_DDL_MESSAGE_SIZE, &found);
+	extension_ddl_message =
+	        DiskquotaShmemInitStruct("disk_quota_extension_ddl_message", EXTENSION_DDL_MESSAGE_SIZE, &found);
 	if (!found) memset((void *)extension_ddl_message, 0, EXTENSION_DDL_MESSAGE_SIZE);
 
 	memset(&hash_ctl, 0, sizeof(hash_ctl));
@@ -612,9 +607,9 @@ init_disk_quota_model(uint32 id)
 	table_size_map     = DiskquotaShmemInitHash(str.data, INIT_NUM_TABLE_SIZE_ENTRIES, MAX_NUM_TABLE_SIZE_ENTRIES,
 	                                            &hash_ctl, HASH_ELEM, DISKQUOTA_TAG_HASH);
 	format_name("TableSizeEntrymap_last_overflow_report", id, &str);
-	table_size_map_last_overflow_report = ShmemInitStruct(str.data, TABLE_SIZE_MAP_LAST_OVERFLOW_REPORT_SIZE, &found);
+	table_size_map_last_overflow_report =
+	        DiskquotaShmemInitStruct(str.data, TABLE_SIZE_MAP_LAST_OVERFLOW_REPORT_SIZE, &found);
 	if (!found) *table_size_map_last_overflow_report = 0;
-	diskquota_shmem_size_sub(TABLE_SIZE_MAP_LAST_OVERFLOW_REPORT_SIZE);
 
 	/* for localrejectmap */
 	/* WARNNING: The max length of name of the map is 48 */
@@ -628,9 +623,8 @@ init_disk_quota_model(uint32 id)
 
 	format_name("localrejectmap_last_overflow_report", id, &str);
 	local_disk_quota_reject_map_last_overflow_report =
-	        ShmemInitStruct(str.data, LOCAL_DISK_QUOTA_REJECT_MAP_LAST_OVERFLOW_REPORT_SIZE, &found);
+	        DiskquotaShmemInitStruct(str.data, LOCAL_DISK_QUOTA_REJECT_MAP_LAST_OVERFLOW_REPORT_SIZE, &found);
 	if (!found) *local_disk_quota_reject_map_last_overflow_report = 0;
-	diskquota_shmem_size_sub(LOCAL_DISK_QUOTA_REJECT_MAP_LAST_OVERFLOW_REPORT_SIZE);
 
 	/* for quota_info_map */
 	format_name("QuotaInfoMap", id, &str);
@@ -640,9 +634,9 @@ init_disk_quota_model(uint32 id)
 	quota_info_map     = DiskquotaShmemInitHash(str.data, INIT_QUOTA_MAP_ENTRIES, MAX_QUOTA_MAP_ENTRIES, &hash_ctl,
 	                                            HASH_ELEM, DISKQUOTA_TAG_HASH);
 	format_name("QuotaInfoMap_last_overflow_report", id, &str);
-	quota_info_map_last_overflow_report = ShmemInitStruct(str.data, QUOTA_INFO_MAP_LAST_OVERFLOW_REPORT_SIZE, &found);
+	quota_info_map_last_overflow_report =
+	        DiskquotaShmemInitStruct(str.data, QUOTA_INFO_MAP_LAST_OVERFLOW_REPORT_SIZE, &found);
 	if (!found) *quota_info_map_last_overflow_report = 0;
-	diskquota_shmem_size_sub(QUOTA_INFO_MAP_LAST_OVERFLOW_REPORT_SIZE);
 
 	pfree(str.data);
 }
@@ -686,9 +680,9 @@ vacuum_disk_quota_model(uint32 id)
 	}
 
 	format_name("TableSizeEntrymap_last_overflow_report", id, &str);
-	table_size_map_last_overflow_report = ShmemInitStruct(str.data, TABLE_SIZE_MAP_LAST_OVERFLOW_REPORT_SIZE, &found);
+	table_size_map_last_overflow_report =
+	        DiskquotaShmemInitStruct(str.data, TABLE_SIZE_MAP_LAST_OVERFLOW_REPORT_SIZE, &found);
 	if (!found) *table_size_map_last_overflow_report = 0;
-	diskquota_shmem_size_sub(TABLE_SIZE_MAP_LAST_OVERFLOW_REPORT_SIZE);
 
 	/* localrejectmap */
 	format_name("localrejectmap", id, &str);
@@ -705,9 +699,8 @@ vacuum_disk_quota_model(uint32 id)
 	}
 	format_name("localrejectmap_last_overflow_report", id, &str);
 	local_disk_quota_reject_map_last_overflow_report =
-	        ShmemInitStruct(str.data, LOCAL_DISK_QUOTA_REJECT_MAP_LAST_OVERFLOW_REPORT_SIZE, &found);
+	        DiskquotaShmemInitStruct(str.data, LOCAL_DISK_QUOTA_REJECT_MAP_LAST_OVERFLOW_REPORT_SIZE, &found);
 	if (!found) *local_disk_quota_reject_map_last_overflow_report = 0;
-	diskquota_shmem_size_sub(LOCAL_DISK_QUOTA_REJECT_MAP_LAST_OVERFLOW_REPORT_SIZE);
 
 	/* quota_info_map */
 	format_name("QuotaInfoMap", id, &str);
@@ -722,9 +715,9 @@ vacuum_disk_quota_model(uint32 id)
 		hash_search(quota_info_map, &qentry->key, HASH_REMOVE, NULL);
 	}
 	format_name("QuotaInfoMap_last_overflow_report", id, &str);
-	quota_info_map_last_overflow_report = ShmemInitStruct(str.data, QUOTA_INFO_MAP_LAST_OVERFLOW_REPORT_SIZE, &found);
+	quota_info_map_last_overflow_report =
+	        DiskquotaShmemInitStruct(str.data, QUOTA_INFO_MAP_LAST_OVERFLOW_REPORT_SIZE, &found);
 	if (!found) *quota_info_map_last_overflow_report = 0;
-	diskquota_shmem_size_sub(QUOTA_INFO_MAP_LAST_OVERFLOW_REPORT_SIZE);
 
 	pfree(str.data);
 }
@@ -2419,7 +2412,6 @@ diskquota_shmem_size_sub(Size size)
 {
 	Assert(pg_atomic_read_u64(diskquota_shmem_size) >= size);
 
-	if (!DiskquotaLauncherShmem || !DiskquotaLauncherShmem->isDynamicWorker)
-		pg_atomic_sub_fetch_u64(diskquota_shmem_size, size);
+	pg_atomic_sub_fetch_u64(diskquota_shmem_size, size);
 }
 #endif
