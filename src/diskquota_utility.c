@@ -1647,8 +1647,10 @@ DiskquotaShmemInitHash(const char           *name,       /* table string name fo
                        int                   hash_flags, /* info about infoP */
                        DiskquotaHashFunction hashFunction)
 {
+#ifdef USE_ASSERT_CHECKING
 	if (!DiskquotaLauncherShmem || !DiskquotaLauncherShmem->isDynamicWorker)
 		diskquota_shmem_size_sub(hash_estimate_size(max_size, infoP->entrysize));
+#endif
 
 #if GP_VERSION_NUM < 70000
 	if (hashFunction == DISKQUOTA_TAG_HASH)
@@ -1666,7 +1668,9 @@ DiskquotaShmemInitHash(const char           *name,       /* table string name fo
 void *
 DiskquotaShmemInitStruct(const char *name, Size size, bool *foundPtr)
 {
+#ifdef USE_ASSERT_CHECKING
 	if (!DiskquotaLauncherShmem || !DiskquotaLauncherShmem->isDynamicWorker) diskquota_shmem_size_sub(size);
+#endif
 
 	return ShmemInitStruct(name, size, foundPtr);
 }
