@@ -71,6 +71,10 @@
 	         ? ((entry->key.id + 1) * SEGMENT_SIZE_ARRAY_LENGTH - 1)  \
 	         : SEGCOUNT)
 
+#define TABLE_SIZE_MAP_LAST_OVERFLOW_REPORT_SIZE sizeof(TimestampTz)
+#define LOCAL_DISK_QUOTA_REJECT_MAP_LAST_OVERFLOW_REPORT_SIZE sizeof(TimestampTz)
+#define QUOTA_INFO_MAP_LAST_OVERFLOW_REPORT_SIZE sizeof(TimestampTz)
+
 typedef struct TableSizeEntry       TableSizeEntry;
 typedef struct NamespaceSizeEntry   NamespaceSizeEntry;
 typedef struct RoleSizeEntry        RoleSizeEntry;
@@ -546,9 +550,9 @@ diskquota_worker_shmem_size(void)
 	size = add_size(size, hash_estimate_size(diskquota_max_local_reject_entries,
 	                                         sizeof(LocalRejectMapEntry))); // local_disk_quota_reject_map
 	size = add_size(size, hash_estimate_size(MAX_QUOTA_MAP_ENTRIES, sizeof(QuotaInfoEntry))); // quota_info_map
-	size = add_size(size, sizeof(TimestampTz)); // table_size_map_last_overflow_report
-	size = add_size(size, sizeof(TimestampTz)); // local_disk_quota_reject_map_last_overflow_report
-	size = add_size(size, sizeof(TimestampTz)); // quota_info_map_last_overflow_report
+	size = add_size(size, TABLE_SIZE_MAP_LAST_OVERFLOW_REPORT_SIZE);
+	size = add_size(size, LOCAL_DISK_QUOTA_REJECT_MAP_LAST_OVERFLOW_REPORT_SIZE);
+	size = add_size(size, QUOTA_INFO_MAP_LAST_OVERFLOW_REPORT_SIZE);
 	return size;
 }
 
@@ -606,11 +610,11 @@ init_disk_quota_model(uint32 id)
 	table_size_map     = DiskquotaShmemInitHash(str.data, INIT_NUM_TABLE_SIZE_ENTRIES, MAX_NUM_TABLE_SIZE_ENTRIES,
 	                                            &hash_ctl, HASH_ELEM, DISKQUOTA_TAG_HASH);
 	format_name("TableSizeEntrymap_last_overflow_report", id, &str);
-	table_size_map_last_overflow_report = ShmemInitStruct(str.data, sizeof(TimestampTz), &found);
+	table_size_map_last_overflow_report = ShmemInitStruct(str.data, TABLE_SIZE_MAP_LAST_OVERFLOW_REPORT_SIZE, &found);
 	if (!found) *table_size_map_last_overflow_report = 0;
 
 #ifdef USE_ASSERT_CHECKING
-	if (!found) diskquota_shmem_size_sub(sizeof(TimestampTz)); // table_size_map_last_overflow_report
+	if (!found) diskquota_shmem_size_sub(TABLE_SIZE_MAP_LAST_OVERFLOW_REPORT_SIZE);
 #endif
 
 	/* for localrejectmap */
@@ -624,11 +628,12 @@ init_disk_quota_model(uint32 id)
 	                               &hash_ctl, HASH_ELEM, DISKQUOTA_TAG_HASH);
 
 	format_name("localrejectmap_last_overflow_report", id, &str);
-	local_disk_quota_reject_map_last_overflow_report = ShmemInitStruct(str.data, sizeof(TimestampTz), &found);
+	local_disk_quota_reject_map_last_overflow_report =
+	        ShmemInitStruct(str.data, LOCAL_DISK_QUOTA_REJECT_MAP_LAST_OVERFLOW_REPORT_SIZE, &found);
 	if (!found) *local_disk_quota_reject_map_last_overflow_report = 0;
 
 #ifdef USE_ASSERT_CHECKING
-	if (!found) diskquota_shmem_size_sub(sizeof(TimestampTz)); // local_disk_quota_reject_map_last_overflow_report
+	if (!found) diskquota_shmem_size_sub(LOCAL_DISK_QUOTA_REJECT_MAP_LAST_OVERFLOW_REPORT_SIZE);
 #endif
 
 	/* for quota_info_map */
@@ -639,11 +644,11 @@ init_disk_quota_model(uint32 id)
 	quota_info_map     = DiskquotaShmemInitHash(str.data, INIT_QUOTA_MAP_ENTRIES, MAX_QUOTA_MAP_ENTRIES, &hash_ctl,
 	                                            HASH_ELEM, DISKQUOTA_TAG_HASH);
 	format_name("QuotaInfoMap_last_overflow_report", id, &str);
-	quota_info_map_last_overflow_report = ShmemInitStruct(str.data, sizeof(TimestampTz), &found);
+	quota_info_map_last_overflow_report = ShmemInitStruct(str.data, QUOTA_INFO_MAP_LAST_OVERFLOW_REPORT_SIZE, &found);
 	if (!found) *quota_info_map_last_overflow_report = 0;
 
 #ifdef USE_ASSERT_CHECKING
-	if (!found) diskquota_shmem_size_sub(sizeof(TimestampTz)); // quota_info_map_last_overflow_report
+	if (!found) diskquota_shmem_size_sub(QUOTA_INFO_MAP_LAST_OVERFLOW_REPORT_SIZE);
 #endif
 
 	pfree(str.data);
@@ -688,7 +693,7 @@ vacuum_disk_quota_model(uint32 id)
 	}
 
 	format_name("TableSizeEntrymap_last_overflow_report", id, &str);
-	table_size_map_last_overflow_report = ShmemInitStruct(str.data, sizeof(TimestampTz), &found);
+	table_size_map_last_overflow_report = ShmemInitStruct(str.data, TABLE_SIZE_MAP_LAST_OVERFLOW_REPORT_SIZE, &found);
 	if (!found) *table_size_map_last_overflow_report = 0;
 	/* localrejectmap */
 	format_name("localrejectmap", id, &str);
@@ -704,7 +709,8 @@ vacuum_disk_quota_model(uint32 id)
 		hash_search(local_disk_quota_reject_map, &localrejectentry->keyitem, HASH_REMOVE, NULL);
 	}
 	format_name("localrejectmap_last_overflow_report", id, &str);
-	local_disk_quota_reject_map_last_overflow_report = ShmemInitStruct(str.data, sizeof(TimestampTz), &found);
+	local_disk_quota_reject_map_last_overflow_report =
+	        ShmemInitStruct(str.data, LOCAL_DISK_QUOTA_REJECT_MAP_LAST_OVERFLOW_REPORT_SIZE, &found);
 	if (!found) *local_disk_quota_reject_map_last_overflow_report = 0;
 
 	/* quota_info_map */
@@ -720,7 +726,7 @@ vacuum_disk_quota_model(uint32 id)
 		hash_search(quota_info_map, &qentry->key, HASH_REMOVE, NULL);
 	}
 	format_name("QuotaInfoMap_last_overflow_report", id, &str);
-	quota_info_map_last_overflow_report = ShmemInitStruct(str.data, sizeof(TimestampTz), &found);
+	quota_info_map_last_overflow_report = ShmemInitStruct(str.data, QUOTA_INFO_MAP_LAST_OVERFLOW_REPORT_SIZE, &found);
 	if (!found) *quota_info_map_last_overflow_report = 0;
 
 	pfree(str.data);
