@@ -322,14 +322,14 @@ dump_monitored_dbid_cache(long *nitems)
 	HASH_SEQ_STATUS seq;
 	MonitorDBEntry  curEntry;
 	int             count = *nitems = hash_get_num_entries(monitored_dbid_cache);
-	MonitorDBEntry  entries = curEntry = (MonitorDBEntry)palloc(sizeof(struct MonitorDBEntryStruct) * count);
+	MonitorDBEntry  entries = curEntry = (MonitorDBEntry)palloc(MONITORED_DBID_CACHE_ENTRY_SIZE * count);
 
 	hash_seq_init(&seq, monitored_dbid_cache);
 	MonitorDBEntry entry;
 	while ((entry = hash_seq_search(&seq)) != NULL)
 	{
 		Assert(count > 0);
-		memcpy(curEntry, entry, sizeof(struct MonitorDBEntryStruct));
+		memcpy(curEntry, entry, MONITORED_DBID_CACHE_ENTRY_SIZE);
 		curEntry++;
 		count--;
 	}

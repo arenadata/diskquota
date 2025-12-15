@@ -489,7 +489,7 @@ disk_quota_shmem_startup(void)
 
 	memset(&hash_ctl, 0, sizeof(hash_ctl));
 	hash_ctl.keysize   = sizeof(Oid);
-	hash_ctl.entrysize = sizeof(struct MonitorDBEntryStruct);
+	hash_ctl.entrysize = MONITORED_DBID_CACHE_ENTRY_SIZE;
 
 	monitored_dbid_cache =
 	        DiskquotaShmemInitHash("table oid cache which shoud tracking", diskquota_max_monitored_databases,
@@ -576,8 +576,7 @@ DiskQuotaShmemSize(void)
 	size = add_size(size, hash_estimate_size(diskquota_max_active_tables, RELATION_CACHE_ENTRY_SIZE));
 	size = add_size(size, hash_estimate_size(diskquota_max_active_tables, RELID_CACHE_ENTRY_SIZE));
 	size = add_size(size, hash_estimate_size(diskquota_max_active_tables, ALTERED_RELOID_CACHE_ENTRY_SIZE));
-	size = add_size(size, hash_estimate_size(diskquota_max_monitored_databases,
-	                                         sizeof(struct MonitorDBEntryStruct))); // monitored_dbid_cache
+	size = add_size(size, hash_estimate_size(diskquota_max_monitored_databases, MONITORED_DBID_CACHE_ENTRY_SIZE));
 
 	if (IS_QUERY_DISPATCHER())
 	{
