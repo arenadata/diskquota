@@ -76,6 +76,7 @@ extern int diskquota_worker_timeout;
 #endif /* GP_VERSION_NUM */
 
 #define EXTENSION_DDL_MESSAGE_SIZE sizeof(ExtensionDDLMessage)
+#define ACTIVE_TABLES_MAP_ENTRY_SIZE sizeof(DiskQuotaActiveTableFileEntry)
 
 typedef enum
 {

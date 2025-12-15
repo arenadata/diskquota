@@ -572,8 +572,7 @@ DiskQuotaShmemSize(void)
 #endif
 
 	size = add_size(size, hash_estimate_size(MAX_DISK_QUOTA_REJECT_ENTRIES, DISK_QUOTA_REJECT_MAP_ENTRY_SIZE));
-	size = add_size(size, hash_estimate_size(diskquota_max_active_tables,
-	                                         sizeof(DiskQuotaActiveTableFileEntry))); // active_tables_map
+	size = add_size(size, hash_estimate_size(diskquota_max_active_tables, ACTIVE_TABLES_MAP_ENTRY_SIZE));
 	size = add_size(size, hash_estimate_size(diskquota_max_active_tables,
 	                                         sizeof(DiskQuotaRelationCacheEntry))); // relation_cache
 	size = add_size(size,

@@ -109,8 +109,8 @@ init_shm_worker_active_tables(void)
 	HASHCTL ctl;
 
 	memset(&ctl, 0, sizeof(ctl));
-	ctl.keysize       = sizeof(DiskQuotaActiveTableFileEntry);
-	ctl.entrysize     = sizeof(DiskQuotaActiveTableFileEntry);
+	ctl.keysize       = ACTIVE_TABLES_MAP_ENTRY_SIZE;
+	ctl.entrysize     = ACTIVE_TABLES_MAP_ENTRY_SIZE;
 	active_tables_map = DiskquotaShmemInitHash("active_tables", diskquota_max_active_tables,
 	                                           diskquota_max_active_tables, &ctl, HASH_ELEM, DISKQUOTA_TAG_HASH);
 
@@ -322,7 +322,7 @@ report_active_table_helper(const RelFileNodeBackend *relFileNode)
 	}
 	found = false;
 
-	MemSet(&item, 0, sizeof(DiskQuotaActiveTableFileEntry));
+	MemSet(&item, 0, ACTIVE_TABLES_MAP_ENTRY_SIZE);
 	item.dbid          = relFileNode->node.dbNode;
 	item.relfilenode   = relFileNode->node.relNode;
 	item.tablespaceoid = relFileNode->node.spcNode;
@@ -730,8 +730,8 @@ get_active_tables_oid(void)
 	refresh_monitored_dbid_cache();
 
 	memset(&ctl, 0, sizeof(ctl));
-	ctl.keysize                 = sizeof(DiskQuotaActiveTableFileEntry);
-	ctl.entrysize               = sizeof(DiskQuotaActiveTableFileEntry);
+	ctl.keysize                 = ACTIVE_TABLES_MAP_ENTRY_SIZE;
+	ctl.entrysize               = ACTIVE_TABLES_MAP_ENTRY_SIZE;
 	ctl.hcxt                    = CurrentMemoryContext;
 	local_active_table_file_map = diskquota_hash_create("local active table map with relfilenode info", 1024, &ctl,
 	                                                    HASH_ELEM | HASH_CONTEXT, DISKQUOTA_TAG_HASH);
