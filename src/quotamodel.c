@@ -219,8 +219,9 @@ static const char *local_disk_quota_reject_map_warning =
 static shmem_startup_hook_type prev_shmem_startup_hook = NULL;
 
 #ifdef USE_ASSERT_CHECKING
-pg_atomic_uint64 *diskquota_shmem_size;
-void              diskquota_shmem_size_sub(Size size);
+extern DiskquotaLauncherShmemStruct *DiskquotaLauncherShmem;
+pg_atomic_uint64                    *diskquota_shmem_size;
+void                                 diskquota_shmem_size_sub(Size size);
 #endif
 
 /* functions to maintain the quota maps */
@@ -613,7 +614,8 @@ init_disk_quota_model(uint32 id)
 	if (!found) *table_size_map_last_overflow_report = 0;
 
 #ifdef USE_ASSERT_CHECKING
-	if (!found) diskquota_shmem_size_sub(TABLE_SIZE_MAP_LAST_OVERFLOW_REPORT_SIZE);
+	if (!DiskquotaLauncherShmem || !DiskquotaLauncherShmem->isDynamicWorker)
+		diskquota_shmem_size_sub(TABLE_SIZE_MAP_LAST_OVERFLOW_REPORT_SIZE);
 #endif
 
 	/* for localrejectmap */
@@ -632,7 +634,8 @@ init_disk_quota_model(uint32 id)
 	if (!found) *local_disk_quota_reject_map_last_overflow_report = 0;
 
 #ifdef USE_ASSERT_CHECKING
-	if (!found) diskquota_shmem_size_sub(LOCAL_DISK_QUOTA_REJECT_MAP_LAST_OVERFLOW_REPORT_SIZE);
+	if (!DiskquotaLauncherShmem || !DiskquotaLauncherShmem->isDynamicWorker)
+		diskquota_shmem_size_sub(LOCAL_DISK_QUOTA_REJECT_MAP_LAST_OVERFLOW_REPORT_SIZE);
 #endif
 
 	/* for quota_info_map */
@@ -647,7 +650,8 @@ init_disk_quota_model(uint32 id)
 	if (!found) *quota_info_map_last_overflow_report = 0;
 
 #ifdef USE_ASSERT_CHECKING
-	if (!found) diskquota_shmem_size_sub(QUOTA_INFO_MAP_LAST_OVERFLOW_REPORT_SIZE);
+	if (!DiskquotaLauncherShmem || !DiskquotaLauncherShmem->isDynamicWorker)
+		diskquota_shmem_size_sub(QUOTA_INFO_MAP_LAST_OVERFLOW_REPORT_SIZE);
 #endif
 
 	pfree(str.data);
@@ -694,6 +698,12 @@ vacuum_disk_quota_model(uint32 id)
 	format_name("TableSizeEntrymap_last_overflow_report", id, &str);
 	table_size_map_last_overflow_report = ShmemInitStruct(str.data, TABLE_SIZE_MAP_LAST_OVERFLOW_REPORT_SIZE, &found);
 	if (!found) *table_size_map_last_overflow_report = 0;
+
+#ifdef USE_ASSERT_CHECKING
+	if (!DiskquotaLauncherShmem || !DiskquotaLauncherShmem->isDynamicWorker)
+		diskquota_shmem_size_sub(TABLE_SIZE_MAP_LAST_OVERFLOW_REPORT_SIZE);
+#endif
+
 	/* localrejectmap */
 	format_name("localrejectmap", id, &str);
 	memset(&hash_ctl, 0, sizeof(hash_ctl));
@@ -712,6 +722,11 @@ vacuum_disk_quota_model(uint32 id)
 	        ShmemInitStruct(str.data, LOCAL_DISK_QUOTA_REJECT_MAP_LAST_OVERFLOW_REPORT_SIZE, &found);
 	if (!found) *local_disk_quota_reject_map_last_overflow_report = 0;
 
+#ifdef USE_ASSERT_CHECKING
+	if (!DiskquotaLauncherShmem || !DiskquotaLauncherShmem->isDynamicWorker)
+		diskquota_shmem_size_sub(LOCAL_DISK_QUOTA_REJECT_MAP_LAST_OVERFLOW_REPORT_SIZE);
+#endif
+
 	/* quota_info_map */
 	format_name("QuotaInfoMap", id, &str);
 	memset(&hash_ctl, 0, sizeof(hash_ctl));
@@ -727,6 +742,11 @@ vacuum_disk_quota_model(uint32 id)
 	format_name("QuotaInfoMap_last_overflow_report", id, &str);
 	quota_info_map_last_overflow_report = ShmemInitStruct(str.data, QUOTA_INFO_MAP_LAST_OVERFLOW_REPORT_SIZE, &found);
 	if (!found) *quota_info_map_last_overflow_report = 0;
+
+#ifdef USE_ASSERT_CHECKING
+	if (!DiskquotaLauncherShmem || !DiskquotaLauncherShmem->isDynamicWorker)
+		diskquota_shmem_size_sub(QUOTA_INFO_MAP_LAST_OVERFLOW_REPORT_SIZE);
+#endif
 
 	pfree(str.data);
 }
