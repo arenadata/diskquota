@@ -117,6 +117,7 @@ static void   check_role(Oid roleoid, char *rolname, int64 quota_limit_mb);
 #ifdef USE_ASSERT_CHECKING
 extern DiskquotaLauncherShmemStruct *DiskquotaLauncherShmem;
 extern pg_atomic_uint64             *diskquota_shmem_size;
+extern void                          diskquota_shmem_size_sub(Size size);
 #endif
 
 /* ---- Help Functions to set quota limit. ---- */
@@ -1649,11 +1650,7 @@ DiskquotaShmemInitHash(const char           *name,       /* table string name fo
 {
 #ifdef USE_ASSERT_CHECKING
 	if (!DiskquotaLauncherShmem || !DiskquotaLauncherShmem->isDynamicWorker)
-	{
-		Size size = hash_estimate_size(max_size, infoP->entrysize);
-		Assert(pg_atomic_read_u64(diskquota_shmem_size) >= size);
-		pg_atomic_sub_fetch_u64(diskquota_shmem_size, size);
-	}
+		diskquota_shmem_size_sub(hash_estimate_size(max_size, infoP->entrysize));
 #endif
 #if GP_VERSION_NUM < 70000
 	if (hashFunction == DISKQUOTA_TAG_HASH)

@@ -212,6 +212,7 @@ static shmem_startup_hook_type prev_shmem_startup_hook = NULL;
 
 #ifdef USE_ASSERT_CHECKING
 pg_atomic_uint64 *diskquota_shmem_size;
+void              diskquota_shmem_size_sub(Size size);
 #endif
 
 /* functions to maintain the quota maps */
@@ -452,17 +453,10 @@ disk_quota_shmem_startup(void)
 	if (!found)
 	{
 		pg_atomic_init_u64(diskquota_shmem_size, DiskQuotaShmemSize());
-		Assert(pg_atomic_read_u64(diskquota_shmem_size) >= sizeof(pg_atomic_uint64));
-		pg_atomic_sub_fetch_u64(diskquota_shmem_size, sizeof(pg_atomic_uint64)); // diskquota_shmem_size
-		Assert(pg_atomic_read_u64(diskquota_shmem_size) >= sizeof(ExtensionDDLMessage));
-		pg_atomic_sub_fetch_u64(diskquota_shmem_size, sizeof(ExtensionDDLMessage)); // extension_ddl_message
+		diskquota_shmem_size_sub(sizeof(pg_atomic_uint64));    // diskquota_shmem_size
+		diskquota_shmem_size_sub(sizeof(ExtensionDDLMessage)); // extension_ddl_message
 
-		if (IS_QUERY_DISPATCHER())
-		{
-			Size size = diskquota_launcher_shmem_size();
-			Assert(pg_atomic_read_u64(diskquota_shmem_size) >= size);
-			pg_atomic_sub_fetch_u64(diskquota_shmem_size, size); // DiskquotaLauncherShmem
-		}
+		if (IS_QUERY_DISPATCHER()) diskquota_shmem_size_sub(diskquota_launcher_shmem_size()); // DiskquotaLauncherShmem
 	}
 #endif
 
@@ -618,13 +612,9 @@ init_disk_quota_model(uint32 id)
 #ifdef USE_ASSERT_CHECKING
 	if (!found)
 	{
-		Assert(pg_atomic_read_u64(diskquota_shmem_size) >= sizeof(TimestampTz));
-		pg_atomic_sub_fetch_u64(diskquota_shmem_size, sizeof(TimestampTz)); // table_size_map_last_overflow_report
-		Assert(pg_atomic_read_u64(diskquota_shmem_size) >= sizeof(TimestampTz));
-		pg_atomic_sub_fetch_u64(diskquota_shmem_size,
-		                        sizeof(TimestampTz)); // local_disk_quota_reject_map_last_overflow_report
-		Assert(pg_atomic_read_u64(diskquota_shmem_size) >= sizeof(TimestampTz));
-		pg_atomic_sub_fetch_u64(diskquota_shmem_size, sizeof(TimestampTz)); // quota_info_map_last_overflow_report
+		diskquota_shmem_size_sub(sizeof(TimestampTz)); // table_size_map_last_overflow_report
+		diskquota_shmem_size_sub(sizeof(TimestampTz)); // local_disk_quota_reject_map_last_overflow_report
+		diskquota_shmem_size_sub(sizeof(TimestampTz)); // quota_info_map_last_overflow_report
 	}
 #endif
 
@@ -2416,3 +2406,12 @@ set_table_size_entry_flag(TableSizeEntry *entry, TableSizeEntryFlag flag)
 {
 	entry->flag |= flag;
 }
+
+#ifdef USE_ASSERT_CHECKING
+void
+diskquota_shmem_size_sub(Size size)
+{
+	Assert(pg_atomic_read_u64(diskquota_shmem_size) >= size);
+	pg_atomic_sub_fetch_u64(diskquota_shmem_size, size);
+}
+#endif
