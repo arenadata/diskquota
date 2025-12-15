@@ -575,7 +575,7 @@ DiskQuotaShmemSize(void)
 	size = add_size(size, hash_estimate_size(diskquota_max_active_tables, ACTIVE_TABLES_MAP_ENTRY_SIZE));
 	size = add_size(size, hash_estimate_size(diskquota_max_active_tables, RELATION_CACHE_ENTRY_SIZE));
 	size = add_size(size, hash_estimate_size(diskquota_max_active_tables, RELID_CACHE_ENTRY_SIZE));
-	size = add_size(size, hash_estimate_size(diskquota_max_active_tables, sizeof(Oid))); // altered_reloid_cache
+	size = add_size(size, hash_estimate_size(diskquota_max_active_tables, ALTERED_RELOID_CACHE_ENTRY_SIZE));
 	size = add_size(size, hash_estimate_size(diskquota_max_monitored_databases,
 	                                         sizeof(struct MonitorDBEntryStruct))); // monitored_dbid_cache
 

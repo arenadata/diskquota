@@ -115,8 +115,8 @@ init_shm_worker_active_tables(void)
 	                                           diskquota_max_active_tables, &ctl, HASH_ELEM, DISKQUOTA_TAG_HASH);
 
 	memset(&ctl, 0, sizeof(ctl));
-	ctl.keysize          = sizeof(Oid);
-	ctl.entrysize        = sizeof(Oid);
+	ctl.keysize          = ALTERED_RELOID_CACHE_ENTRY_SIZE;
+	ctl.entrysize        = ALTERED_RELOID_CACHE_ENTRY_SIZE;
 	altered_reloid_cache = DiskquotaShmemInitHash("altered_reloid_cache", diskquota_max_active_tables,
 	                                              diskquota_max_active_tables, &ctl, HASH_ELEM, DISKQUOTA_OID_HASH);
 }
@@ -737,8 +737,8 @@ get_active_tables_oid(void)
 	                                                    HASH_ELEM | HASH_CONTEXT, DISKQUOTA_TAG_HASH);
 
 	memset(&ctl, 0, sizeof(ctl));
-	ctl.keysize                = sizeof(Oid);
-	ctl.entrysize              = sizeof(Oid);
+	ctl.keysize                = ALTERED_RELOID_CACHE_ENTRY_SIZE;
+	ctl.entrysize              = ALTERED_RELOID_CACHE_ENTRY_SIZE;
 	ctl.hcxt                   = CurrentMemoryContext;
 	local_altered_reloid_cache = diskquota_hash_create("local_altered_reloid_cache", 1024, &ctl,
 	                                                   HASH_ELEM | HASH_CONTEXT, DISKQUOTA_OID_HASH);
