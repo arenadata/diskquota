@@ -75,6 +75,8 @@ extern int diskquota_worker_timeout;
 #define DiskquotaGetRelstorage(classForm) (0)
 #endif /* GP_VERSION_NUM */
 
+#define EXTENSION_DDL_MESSAGE_SIZE sizeof(ExtensionDDLMessage)
+
 typedef enum
 {
 	NAMESPACE_QUOTA = 0,

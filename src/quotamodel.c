@@ -457,8 +457,8 @@ disk_quota_shmem_startup(void)
 	if (!found)
 	{
 		pg_atomic_init_u64(diskquota_shmem_size, DiskQuotaShmemSize());
-		diskquota_shmem_size_sub(sizeof(pg_atomic_uint64));    // diskquota_shmem_size
-		diskquota_shmem_size_sub(sizeof(ExtensionDDLMessage)); // extension_ddl_message
+		diskquota_shmem_size_sub(sizeof(pg_atomic_uint64)); // diskquota_shmem_size
+		diskquota_shmem_size_sub(EXTENSION_DDL_MESSAGE_SIZE);
 
 		if (IS_QUERY_DISPATCHER()) diskquota_shmem_size_sub(diskquota_launcher_shmem_size()); // DiskquotaLauncherShmem
 	}
@@ -472,8 +472,8 @@ disk_quota_shmem_startup(void)
 	 * to store out-of-quota rejectmap. active_tables_map is used to store
 	 * active tables whose disk usage is changed.
 	 */
-	extension_ddl_message = ShmemInitStruct("disk_quota_extension_ddl_message", sizeof(ExtensionDDLMessage), &found);
-	if (!found) memset((void *)extension_ddl_message, 0, sizeof(ExtensionDDLMessage));
+	extension_ddl_message = ShmemInitStruct("disk_quota_extension_ddl_message", EXTENSION_DDL_MESSAGE_SIZE, &found);
+	if (!found) memset((void *)extension_ddl_message, 0, EXTENSION_DDL_MESSAGE_SIZE);
 
 	memset(&hash_ctl, 0, sizeof(hash_ctl));
 	hash_ctl.keysize   = sizeof(RejectMapEntry);
@@ -564,7 +564,7 @@ static Size
 DiskQuotaShmemSize(void)
 {
 	Size size;
-	size = sizeof(ExtensionDDLMessage); // extension_ddl_message
+	size = EXTENSION_DDL_MESSAGE_SIZE;
 
 #ifdef USE_ASSERT_CHECKING
 	size = add_size(size, sizeof(pg_atomic_uint64)); // diskquota_shmem_size
