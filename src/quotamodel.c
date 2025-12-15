@@ -74,6 +74,7 @@
 #define TABLE_SIZE_MAP_LAST_OVERFLOW_REPORT_SIZE sizeof(TimestampTz)
 #define LOCAL_DISK_QUOTA_REJECT_MAP_LAST_OVERFLOW_REPORT_SIZE sizeof(TimestampTz)
 #define QUOTA_INFO_MAP_LAST_OVERFLOW_REPORT_SIZE sizeof(TimestampTz)
+#define DISK_QUOTA_REJECT_MAP_ENTRY_SIZE sizeof(GlobalRejectMapEntry)
 
 typedef struct TableSizeEntry       TableSizeEntry;
 typedef struct NamespaceSizeEntry   NamespaceSizeEntry;
@@ -477,7 +478,7 @@ disk_quota_shmem_startup(void)
 
 	memset(&hash_ctl, 0, sizeof(hash_ctl));
 	hash_ctl.keysize   = sizeof(RejectMapEntry);
-	hash_ctl.entrysize = sizeof(GlobalRejectMapEntry);
+	hash_ctl.entrysize = DISK_QUOTA_REJECT_MAP_ENTRY_SIZE;
 	disk_quota_reject_map =
 	        DiskquotaShmemInitHash("rejectmap whose quota limitation is reached", diskquota_max_local_reject_entries,
 	                               MAX_DISK_QUOTA_REJECT_ENTRIES, &hash_ctl, HASH_ELEM, DISKQUOTA_TAG_HASH);
@@ -570,8 +571,7 @@ DiskQuotaShmemSize(void)
 	size = add_size(size, sizeof(pg_atomic_uint64)); // diskquota_shmem_size
 #endif
 
-	size = add_size(size, hash_estimate_size(MAX_DISK_QUOTA_REJECT_ENTRIES,
-	                                         sizeof(GlobalRejectMapEntry))); // disk_quota_reject_map
+	size = add_size(size, hash_estimate_size(MAX_DISK_QUOTA_REJECT_ENTRIES, DISK_QUOTA_REJECT_MAP_ENTRY_SIZE));
 	size = add_size(size, hash_estimate_size(diskquota_max_active_tables,
 	                                         sizeof(DiskQuotaActiveTableFileEntry))); // active_tables_map
 	size = add_size(size, hash_estimate_size(diskquota_max_active_tables,
@@ -1973,7 +1973,7 @@ refresh_rejectmap(PG_FUNCTION_ARGS)
 	 */
 	memset(&hashctl, 0, sizeof(hashctl));
 	hashctl.keysize   = sizeof(RejectMapEntry);
-	hashctl.entrysize = sizeof(GlobalRejectMapEntry);
+	hashctl.entrysize = DISK_QUOTA_REJECT_MAP_ENTRY_SIZE;
 	hashctl.hcxt      = CurrentMemoryContext;
 
 	/*
@@ -2223,7 +2223,7 @@ refresh_rejectmap(PG_FUNCTION_ARGS)
 		        check_hash_fullness(disk_quota_reject_map, MAX_DISK_QUOTA_REJECT_ENTRIES, disk_quota_reject_map_warning,
 		                            &disk_quota_reject_map_last_overflow_report);
 		new_entry = hash_search(disk_quota_reject_map, &rejectmapentry->keyitem, action, &found);
-		if (!found && new_entry) memcpy(new_entry, rejectmapentry, sizeof(GlobalRejectMapEntry));
+		if (!found && new_entry) memcpy(new_entry, rejectmapentry, DISK_QUOTA_REJECT_MAP_ENTRY_SIZE);
 	}
 	LWLockRelease(diskquota_locks.reject_map_lock);
 
@@ -2277,7 +2277,7 @@ show_rejectmap(PG_FUNCTION_ARGS)
 		/* Create a local hash table and fill it with entries from shared memory. */
 		memset(&hashctl, 0, sizeof(hashctl));
 		hashctl.keysize          = sizeof(RejectMapEntry);
-		hashctl.entrysize        = sizeof(GlobalRejectMapEntry);
+		hashctl.entrysize        = DISK_QUOTA_REJECT_MAP_ENTRY_SIZE;
 		hashctl.hcxt             = CurrentMemoryContext;
 		rejectmap_ctx->rejectmap = diskquota_hash_create("rejectmap_ctx rejectmap", 1024, &hashctl,
 		                                                 HASH_ELEM | HASH_CONTEXT, DISKQUOTA_TAG_HASH);
