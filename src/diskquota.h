@@ -78,6 +78,7 @@ extern int diskquota_worker_timeout;
 #define EXTENSION_DDL_MESSAGE_SIZE sizeof(ExtensionDDLMessage)
 #define ACTIVE_TABLES_MAP_ENTRY_SIZE sizeof(DiskQuotaActiveTableFileEntry)
 #define RELATION_CACHE_ENTRY_SIZE sizeof(DiskQuotaRelationCacheEntry)
+#define RELID_CACHE_ENTRY_SIZE sizeof(DiskQuotaRelidCacheEntry)
 
 typedef enum
 {

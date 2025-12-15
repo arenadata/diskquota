@@ -60,7 +60,7 @@ init_shm_worker_relation_cache(void)
 
 	memset(&ctl, 0, sizeof(ctl));
 	ctl.keysize   = sizeof(Oid);
-	ctl.entrysize = sizeof(DiskQuotaRelidCacheEntry);
+	ctl.entrysize = RELID_CACHE_ENTRY_SIZE;
 	relid_cache = DiskquotaShmemInitHash("relid_cache", diskquota_max_active_tables, diskquota_max_active_tables, &ctl,
 	                                     HASH_ELEM, DISKQUOTA_OID_HASH);
 }
@@ -208,7 +208,7 @@ update_relation_cache(Oid relid)
 		LWLockRelease(diskquota_locks.relation_cache_lock);
 		return;
 	}
-	memcpy(relid_entry, &relid_entry_data, sizeof(DiskQuotaRelidCacheEntry));
+	memcpy(relid_entry, &relid_entry_data, RELID_CACHE_ENTRY_SIZE);
 	LWLockRelease(diskquota_locks.relation_cache_lock);
 
 	prelid = get_primary_table_oid(relid, false);
