@@ -1645,11 +1645,11 @@ DiskquotaShmemInitHash(const char           *name,       /* table string name fo
                        long                  max_size,   /* max size of the table */
                        HASHCTL              *infoP,      /* info about key and bucket size */
                        int                   hash_flags, /* info about infoP */
-                       DiskquotaHashFunction hashFunction)
+                       DiskquotaHashFunction hashFunction, bool common_counter)
 {
 #ifdef USE_ASSERT_CHECKING
 	if (!DiskquotaLauncherShmem || !DiskquotaLauncherShmem->isDynamicWorker)
-		diskquota_shmem_size_sub(hash_estimate_size(max_size, infoP->entrysize));
+		diskquota_shmem_size_sub(hash_estimate_size(common_counter ? init_size : max_size, infoP->entrysize));
 #endif
 
 #if GP_VERSION_NUM < 70000

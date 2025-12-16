@@ -112,13 +112,14 @@ init_shm_worker_active_tables(void)
 	ctl.keysize       = ACTIVE_TABLES_MAP_ENTRY_SIZE;
 	ctl.entrysize     = ACTIVE_TABLES_MAP_ENTRY_SIZE;
 	active_tables_map = DiskquotaShmemInitHash("active_tables", diskquota_max_active_tables,
-	                                           diskquota_max_active_tables, &ctl, HASH_ELEM, DISKQUOTA_TAG_HASH);
+	                                           diskquota_max_active_tables, &ctl, HASH_ELEM, DISKQUOTA_TAG_HASH, false);
 
 	memset(&ctl, 0, sizeof(ctl));
-	ctl.keysize          = ALTERED_RELOID_CACHE_ENTRY_SIZE;
-	ctl.entrysize        = ALTERED_RELOID_CACHE_ENTRY_SIZE;
-	altered_reloid_cache = DiskquotaShmemInitHash("altered_reloid_cache", diskquota_max_active_tables,
-	                                              diskquota_max_active_tables, &ctl, HASH_ELEM, DISKQUOTA_OID_HASH);
+	ctl.keysize   = ALTERED_RELOID_CACHE_ENTRY_SIZE;
+	ctl.entrysize = ALTERED_RELOID_CACHE_ENTRY_SIZE;
+	altered_reloid_cache =
+	        DiskquotaShmemInitHash("altered_reloid_cache", diskquota_max_active_tables, diskquota_max_active_tables,
+	                               &ctl, HASH_ELEM, DISKQUOTA_OID_HASH, false);
 }
 
 /*
