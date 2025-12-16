@@ -625,16 +625,6 @@ init_disk_quota_model(uint32 id)
 	        DiskquotaShmemInitStruct(str.data, TABLE_SIZE_MAP_LAST_OVERFLOW_REPORT_SIZE, &found);
 	if (!found) *table_size_map_last_overflow_report = 0;
 
-#ifdef USE_ASSERT_CHECKING
-	if (!found)
-	{
-		pg_atomic_sub_fetch_u64(diskquota_shmem_size, sizeof(TimestampTz)); // table_size_map_last_overflow_report
-		pg_atomic_sub_fetch_u64(diskquota_shmem_size,
-		                        sizeof(TimestampTz)); // local_disk_quota_reject_map_last_overflow_report
-		pg_atomic_sub_fetch_u64(diskquota_shmem_size, sizeof(TimestampTz)); // quota_info_map_last_overflow_report
-	}
-#endif
-
 	/* for localrejectmap */
 	/* WARNNING: The max length of name of the map is 48 */
 	format_name("localrejectmap", id, &str);
