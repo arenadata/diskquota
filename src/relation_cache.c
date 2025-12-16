@@ -56,13 +56,13 @@ init_shm_worker_relation_cache(void)
 	ctl.keysize    = sizeof(Oid);
 	ctl.entrysize  = RELATION_CACHE_ENTRY_SIZE;
 	relation_cache = DiskquotaShmemInitHash("relation_cache", diskquota_max_active_tables, diskquota_max_active_tables,
-	                                        &ctl, HASH_ELEM, DISKQUOTA_OID_HASH, false);
+	                                        &ctl, HASH_ELEM, DISKQUOTA_OID_HASH, NULL);
 
 	memset(&ctl, 0, sizeof(ctl));
 	ctl.keysize   = sizeof(Oid);
 	ctl.entrysize = RELID_CACHE_ENTRY_SIZE;
 	relid_cache = DiskquotaShmemInitHash("relid_cache", diskquota_max_active_tables, diskquota_max_active_tables, &ctl,
-	                                     HASH_ELEM, DISKQUOTA_OID_HASH, false);
+	                                     HASH_ELEM, DISKQUOTA_OID_HASH, NULL);
 }
 
 Oid

@@ -85,6 +85,11 @@ extern int diskquota_worker_timeout;
 #define DISKQUOTA_TABLE_SIZE_ENTRY_NUM_SIZE sizeof(pg_atomic_uint32)
 #define DISKQUOTA_QUOTA_INFO_ENTRY_NUM_SIZE sizeof(pg_atomic_uint32)
 
+#ifdef USE_ASSERT_CHECKING
+#define DISKQUOTA_TABLE_SIZE_FLAG_SIZE sizeof(pg_atomic_flag)
+#define DISKQUOTA_QUOTA_INFO_FLAG_SIZE sizeof(pg_atomic_flag)
+#endif
+
 typedef enum
 {
 	NAMESPACE_QUOTA = 0,
@@ -325,7 +330,7 @@ extern void         update_monitordb_status(Oid dbid, uint32 status);
 extern HTAB        *diskquota_hash_create(const char *tabname, long nelem, HASHCTL *info, int flags,
                                           DiskquotaHashFunction hashFunction);
 extern HTAB *DiskquotaShmemInitHash(const char *name, long init_size, long max_size, HASHCTL *infoP, int hash_flags,
-                                    DiskquotaHashFunction hash_function, bool common_counter);
+                                    DiskquotaHashFunction hash_function, pg_atomic_flag *foundPtr);
 extern void *DiskquotaShmemInitStruct(const char *name, Size size, bool *foundPtr);
 extern void  refresh_monitored_dbid_cache(void);
 extern HASHACTION check_hash_fullness_num(HTAB *hashp, int num_entries, int max_size, const char *warning_message,

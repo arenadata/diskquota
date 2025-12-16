@@ -95,6 +95,15 @@ extern int diskquota_max_local_reject_entries;
 
 extern pg_atomic_uint32 *diskquota_table_size_entry_num;
 extern pg_atomic_uint32 *diskquota_quota_info_entry_num;
+
+#ifdef USE_ASSERT_CHECKING
+extern pg_atomic_flag *diskquota_table_size_flag;
+extern pg_atomic_flag *diskquota_quota_info_flag;
+#else
+#define diskquota_table_size_flag NULL
+#define diskquota_quota_info_flag NULL
+#endif
+
 /*
  * local cache of table disk size and corresponding schema and owner.
  *
@@ -490,7 +499,7 @@ disk_quota_shmem_startup(void)
 	hash_ctl.entrysize = DISK_QUOTA_REJECT_MAP_ENTRY_SIZE;
 	disk_quota_reject_map =
 	        DiskquotaShmemInitHash("rejectmap whose quota limitation is reached", diskquota_max_local_reject_entries,
-	                               MAX_DISK_QUOTA_REJECT_ENTRIES, &hash_ctl, HASH_ELEM, DISKQUOTA_TAG_HASH, false);
+	                               MAX_DISK_QUOTA_REJECT_ENTRIES, &hash_ctl, HASH_ELEM, DISKQUOTA_TAG_HASH, NULL);
 
 	init_shm_worker_active_tables();
 
@@ -502,7 +511,7 @@ disk_quota_shmem_startup(void)
 
 	monitored_dbid_cache =
 	        DiskquotaShmemInitHash("table oid cache which shoud tracking", diskquota_max_monitored_databases,
-	                               diskquota_max_monitored_databases, &hash_ctl, HASH_ELEM, DISKQUOTA_OID_HASH, false);
+	                               diskquota_max_monitored_databases, &hash_ctl, HASH_ELEM, DISKQUOTA_OID_HASH, NULL);
 	if (IS_QUERY_DISPATCHER()) init_launcher_shmem();
 	LWLockRelease(AddinShmemInitLock);
 
@@ -594,6 +603,12 @@ DiskQuotaShmemSize(void)
 		size = add_size(size, diskquota_launcher_shmem_size()); // DiskquotaLauncherShmem
 		size = add_size(size, DISKQUOTA_TABLE_SIZE_ENTRY_NUM_SIZE);
 		size = add_size(size, DISKQUOTA_QUOTA_INFO_ENTRY_NUM_SIZE);
+
+#ifdef USE_ASSERT_CHECKING
+		size = add_size(size, DISKQUOTA_TABLE_SIZE_FLAG_SIZE);
+		size = add_size(size, DISKQUOTA_QUOTA_INFO_FLAG_SIZE);
+#endif
+
 		size = add_size(size, hash_estimate_size(MAX_NUM_TABLE_SIZE_ENTRIES, TABLE_SIZE_MAP_ENTRY_SIZE));
 		size = add_size(size, hash_estimate_size(MAX_QUOTA_MAP_ENTRIES, QUOTA_INFO_MAP_ENTRY_SIZE));
 		size = add_size(size, diskquota_worker_shmem_size() * diskquota_max_monitored_databases);
@@ -619,7 +634,7 @@ init_disk_quota_model(uint32 id)
 	hash_ctl.keysize   = sizeof(TableSizeEntryKey);
 	hash_ctl.entrysize = TABLE_SIZE_MAP_ENTRY_SIZE;
 	table_size_map     = DiskquotaShmemInitHash(str.data, INIT_NUM_TABLE_SIZE_ENTRIES, MAX_NUM_TABLE_SIZE_ENTRIES,
-	                                            &hash_ctl, HASH_ELEM, DISKQUOTA_TAG_HASH, true);
+	                                            &hash_ctl, HASH_ELEM, DISKQUOTA_TAG_HASH, diskquota_table_size_flag);
 	format_name("TableSizeEntrymap_last_overflow_report", id, &str);
 	table_size_map_last_overflow_report =
 	        DiskquotaShmemInitStruct(str.data, TABLE_SIZE_MAP_LAST_OVERFLOW_REPORT_SIZE, &found);
@@ -633,7 +648,7 @@ init_disk_quota_model(uint32 id)
 	hash_ctl.entrysize = LOCAL_DISK_QUOTA_REJECT_MAP_ENTRY_SIZE;
 	local_disk_quota_reject_map =
 	        DiskquotaShmemInitHash(str.data, diskquota_max_local_reject_entries, diskquota_max_local_reject_entries,
-	                               &hash_ctl, HASH_ELEM, DISKQUOTA_TAG_HASH, false);
+	                               &hash_ctl, HASH_ELEM, DISKQUOTA_TAG_HASH, NULL);
 
 	format_name("localrejectmap_last_overflow_report", id, &str);
 	local_disk_quota_reject_map_last_overflow_report =
@@ -646,7 +661,7 @@ init_disk_quota_model(uint32 id)
 	hash_ctl.entrysize = QUOTA_INFO_MAP_ENTRY_SIZE;
 	hash_ctl.keysize   = sizeof(QuotaInfoEntryKey);
 	quota_info_map     = DiskquotaShmemInitHash(str.data, INIT_QUOTA_MAP_ENTRIES, MAX_QUOTA_MAP_ENTRIES, &hash_ctl,
-	                                            HASH_ELEM, DISKQUOTA_TAG_HASH, true);
+	                                            HASH_ELEM, DISKQUOTA_TAG_HASH, diskquota_quota_info_flag);
 	format_name("QuotaInfoMap_last_overflow_report", id, &str);
 	quota_info_map_last_overflow_report =
 	        DiskquotaShmemInitStruct(str.data, QUOTA_INFO_MAP_LAST_OVERFLOW_REPORT_SIZE, &found);
@@ -686,7 +701,7 @@ vacuum_disk_quota_model(uint32 id)
 	hash_ctl.keysize   = sizeof(TableSizeEntryKey);
 	hash_ctl.entrysize = TABLE_SIZE_MAP_ENTRY_SIZE;
 	table_size_map     = DiskquotaShmemInitHash(str.data, INIT_NUM_TABLE_SIZE_ENTRIES, MAX_NUM_TABLE_SIZE_ENTRIES,
-	                                            &hash_ctl, HASH_ELEM, DISKQUOTA_TAG_HASH, true);
+	                                            &hash_ctl, HASH_ELEM, DISKQUOTA_TAG_HASH, diskquota_table_size_flag);
 	hash_seq_init(&iter, table_size_map);
 	while ((tsentry = hash_seq_search(&iter)) != NULL)
 	{
@@ -706,7 +721,7 @@ vacuum_disk_quota_model(uint32 id)
 	hash_ctl.entrysize = LOCAL_DISK_QUOTA_REJECT_MAP_ENTRY_SIZE;
 	local_disk_quota_reject_map =
 	        DiskquotaShmemInitHash(str.data, diskquota_max_local_reject_entries, diskquota_max_local_reject_entries,
-	                               &hash_ctl, HASH_ELEM, DISKQUOTA_TAG_HASH, false);
+	                               &hash_ctl, HASH_ELEM, DISKQUOTA_TAG_HASH, NULL);
 	hash_seq_init(&iter, local_disk_quota_reject_map);
 	while ((localrejectentry = hash_seq_search(&iter)) != NULL)
 	{
@@ -723,7 +738,7 @@ vacuum_disk_quota_model(uint32 id)
 	hash_ctl.entrysize = QUOTA_INFO_MAP_ENTRY_SIZE;
 	hash_ctl.keysize   = sizeof(QuotaInfoEntryKey);
 	quota_info_map     = DiskquotaShmemInitHash(str.data, INIT_QUOTA_MAP_ENTRIES, MAX_QUOTA_MAP_ENTRIES, &hash_ctl,
-	                                            HASH_ELEM, DISKQUOTA_TAG_HASH, true);
+	                                            HASH_ELEM, DISKQUOTA_TAG_HASH, diskquota_quota_info_flag);
 	hash_seq_init(&iter, quota_info_map);
 	while ((qentry = hash_seq_search(&iter)) != NULL)
 	{

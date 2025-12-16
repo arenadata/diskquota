@@ -91,13 +91,18 @@ static DiskQuotaWorkerEntry *volatile MyWorkerInfo = NULL;
 // how many database diskquota are monitoring on
 static int num_db = 0;
 
-DiskquotaLauncherShmemStruct *DiskquotaLauncherShmem = NULL;
+static DiskquotaLauncherShmemStruct *DiskquotaLauncherShmem;
 
 /* how many TableSizeEntry are maintained in all the table_size_map in shared memory */
 pg_atomic_uint32 *diskquota_table_size_entry_num;
 
 /* how many QuotaInfoEntry are maintained in all the quota_info_map in shared memory */
 pg_atomic_uint32 *diskquota_quota_info_entry_num;
+
+#ifdef USE_ASSERT_CHECKING
+pg_atomic_flag *diskquota_table_size_flag;
+pg_atomic_flag *diskquota_quota_info_flag;
+#endif
 
 #define MIN_SLEEPTIME 100         /* milliseconds */
 #define BGWORKER_LOG_TIME 3600000 /* milliseconds */
@@ -1787,6 +1792,16 @@ init_launcher_shmem()
 	diskquota_quota_info_entry_num =
 	        DiskquotaShmemInitStruct("diskquota QuotaInfoEntry counter", DISKQUOTA_QUOTA_INFO_ENTRY_NUM_SIZE, &found);
 	if (!found) pg_atomic_init_u32(diskquota_quota_info_entry_num, 0);
+
+#ifdef USE_ASSERT_CHECKING
+	diskquota_table_size_flag =
+	        DiskquotaShmemInitStruct("diskquota TableSizeEntry flag", DISKQUOTA_TABLE_SIZE_FLAG_SIZE, &found);
+	if (!found) pg_atomic_init_flag(diskquota_table_size_flag);
+
+	diskquota_quota_info_flag =
+	        DiskquotaShmemInitStruct("diskquota QuotaInfoEntry flag", DISKQUOTA_QUOTA_INFO_FLAG_SIZE, &found);
+	if (!found) pg_atomic_init_flag(diskquota_quota_info_flag);
+#endif
 }
 
 /*

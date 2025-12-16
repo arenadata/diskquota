@@ -115,8 +115,7 @@ static bool   to_delete_quota(QuotaType type, int64 quota_limit_mb, float4 segra
 static void   check_role(Oid roleoid, char *rolname, int64 quota_limit_mb);
 
 #ifdef USE_ASSERT_CHECKING
-extern DiskquotaLauncherShmemStruct *DiskquotaLauncherShmem;
-extern void                          diskquota_shmem_size_sub(Size size);
+extern void diskquota_shmem_size_sub(Size size);
 #endif
 
 /* ---- Help Functions to set quota limit. ---- */
@@ -1645,12 +1644,9 @@ DiskquotaShmemInitHash(const char           *name,       /* table string name fo
                        long                  max_size,   /* max size of the table */
                        HASHCTL              *infoP,      /* info about key and bucket size */
                        int                   hash_flags, /* info about infoP */
-                       DiskquotaHashFunction hashFunction, bool common_counter)
+                       DiskquotaHashFunction hashFunction, pg_atomic_flag *foundPtr)
 {
-#ifdef USE_ASSERT_CHECKING
-	if (!DiskquotaLauncherShmem || !DiskquotaLauncherShmem->isDynamicWorker)
-		diskquota_shmem_size_sub(hash_estimate_size(common_counter ? init_size : max_size, infoP->entrysize));
-#endif
+	HTAB *hashp;
 
 #if GP_VERSION_NUM < 70000
 	if (hashFunction == DISKQUOTA_TAG_HASH)
@@ -1659,20 +1655,34 @@ DiskquotaShmemInitHash(const char           *name,       /* table string name fo
 		infoP->hash = oid_hash;
 	else
 		infoP->hash = string_hash;
-	return ShmemInitHash(name, init_size, max_size, infoP, hash_flags | HASH_FUNCTION);
+	hashp = ShmemInitHash(name, init_size, max_size, infoP, hash_flags | HASH_FUNCTION);
 #else
-	return ShmemInitHash(name, init_size, max_size, infoP, hash_flags | HASH_BLOBS);
+	hashp = ShmemInitHash(name, init_size, max_size, infoP, hash_flags | HASH_BLOBS);
 #endif /* GP_VERSION_NUM */
+
+#ifdef USE_ASSERT_CHECKING
+	if (!foundPtr)
+		diskquota_shmem_size_sub(hash_estimate_size(max_size, infoP->entrysize));
+	else if (pg_atomic_unlocked_test_flag(foundPtr))
+	{
+		pg_atomic_test_set_flag(foundPtr);
+		diskquota_shmem_size_sub(hash_estimate_size(max_size, infoP->entrysize));
+	}
+#endif
+
+	return hashp;
 }
 
 void *
 DiskquotaShmemInitStruct(const char *name, Size size, bool *foundPtr)
 {
+	void *structPtr = ShmemInitStruct(name, size, foundPtr);
+
 #ifdef USE_ASSERT_CHECKING
-	if (!DiskquotaLauncherShmem || !DiskquotaLauncherShmem->isDynamicWorker) diskquota_shmem_size_sub(size);
+	if (!*foundPtr) diskquota_shmem_size_sub(size);
 #endif
 
-	return ShmemInitStruct(name, size, foundPtr);
+	return structPtr;
 }
 
 HASHACTION
