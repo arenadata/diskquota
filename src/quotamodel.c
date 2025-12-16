@@ -98,9 +98,11 @@ extern pg_atomic_uint32 *diskquota_quota_info_entry_num;
 
 #ifdef USE_ASSERT_CHECKING
 extern pg_atomic_flag *diskquota_table_size_flag;
+pg_atomic_flag        *dlocal_disk_quota_reject_flag;
 extern pg_atomic_flag *diskquota_quota_info_flag;
 #else
 #define diskquota_table_size_flag NULL
+#define dlocal_disk_quota_reject_flag NULL
 #define diskquota_quota_info_flag NULL
 #endif
 
@@ -574,6 +576,9 @@ diskquota_worker_shmem_size(void)
 	size = add_size(size, TABLE_SIZE_MAP_LAST_OVERFLOW_REPORT_SIZE);
 	size = add_size(size, LOCAL_DISK_QUOTA_REJECT_MAP_LAST_OVERFLOW_REPORT_SIZE);
 	size = add_size(size, QUOTA_INFO_MAP_LAST_OVERFLOW_REPORT_SIZE);
+#ifdef USE_ASSERT_CHECKING
+	size = add_size(size, LOCAL_DISK_QUOTA_REJECT_FLAG_SIZE);
+#endif
 	return size;
 }
 
@@ -640,6 +645,12 @@ init_disk_quota_model(uint32 id)
 	        DiskquotaShmemInitStruct(str.data, TABLE_SIZE_MAP_LAST_OVERFLOW_REPORT_SIZE, &found);
 	if (!found) *table_size_map_last_overflow_report = 0;
 
+#ifdef USE_ASSERT_CHECKING
+	format_name("diskquota LocalRejectMapEntry flag", id, &str);
+	dlocal_disk_quota_reject_flag = DiskquotaShmemInitStruct(str.data, LOCAL_DISK_QUOTA_REJECT_FLAG_SIZE, &found);
+	if (!found) pg_atomic_init_flag(dlocal_disk_quota_reject_flag);
+#endif
+
 	/* for localrejectmap */
 	/* WARNNING: The max length of name of the map is 48 */
 	format_name("localrejectmap", id, &str);
@@ -648,7 +659,7 @@ init_disk_quota_model(uint32 id)
 	hash_ctl.entrysize = LOCAL_DISK_QUOTA_REJECT_MAP_ENTRY_SIZE;
 	local_disk_quota_reject_map =
 	        DiskquotaShmemInitHash(str.data, diskquota_max_local_reject_entries, diskquota_max_local_reject_entries,
-	                               &hash_ctl, HASH_ELEM, DISKQUOTA_TAG_HASH, NULL);
+	                               &hash_ctl, HASH_ELEM, DISKQUOTA_TAG_HASH, dlocal_disk_quota_reject_flag);
 
 	format_name("localrejectmap_last_overflow_report", id, &str);
 	local_disk_quota_reject_map_last_overflow_report =
@@ -714,6 +725,12 @@ vacuum_disk_quota_model(uint32 id)
 	        DiskquotaShmemInitStruct(str.data, TABLE_SIZE_MAP_LAST_OVERFLOW_REPORT_SIZE, &found);
 	if (!found) *table_size_map_last_overflow_report = 0;
 
+#ifdef USE_ASSERT_CHECKING
+	format_name("diskquota LocalRejectMapEntry flag", id, &str);
+	dlocal_disk_quota_reject_flag = DiskquotaShmemInitStruct(str.data, LOCAL_DISK_QUOTA_REJECT_FLAG_SIZE, &found);
+	if (!found) pg_atomic_init_flag(dlocal_disk_quota_reject_flag);
+#endif
+
 	/* localrejectmap */
 	format_name("localrejectmap", id, &str);
 	memset(&hash_ctl, 0, sizeof(hash_ctl));
@@ -721,7 +738,7 @@ vacuum_disk_quota_model(uint32 id)
 	hash_ctl.entrysize = LOCAL_DISK_QUOTA_REJECT_MAP_ENTRY_SIZE;
 	local_disk_quota_reject_map =
 	        DiskquotaShmemInitHash(str.data, diskquota_max_local_reject_entries, diskquota_max_local_reject_entries,
-	                               &hash_ctl, HASH_ELEM, DISKQUOTA_TAG_HASH, NULL);
+	                               &hash_ctl, HASH_ELEM, DISKQUOTA_TAG_HASH, dlocal_disk_quota_reject_flag);
 	hash_seq_init(&iter, local_disk_quota_reject_map);
 	while ((localrejectentry = hash_seq_search(&iter)) != NULL)
 	{

@@ -87,6 +87,7 @@ extern int diskquota_worker_timeout;
 
 #ifdef USE_ASSERT_CHECKING
 #define DISKQUOTA_TABLE_SIZE_FLAG_SIZE sizeof(pg_atomic_flag)
+#define LOCAL_DISK_QUOTA_REJECT_FLAG_SIZE sizeof(pg_atomic_flag)
 #define DISKQUOTA_QUOTA_INFO_FLAG_SIZE sizeof(pg_atomic_flag)
 #endif
 
