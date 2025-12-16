@@ -509,7 +509,9 @@ disk_quota_shmem_startup(void)
 #ifdef USE_ASSERT_CHECKING
 	if (IS_QUERY_DISPATCHER())
 		Assert(pg_atomic_read_u64(diskquota_shmem_size) ==
-		       diskquota_worker_shmem_size() * diskquota_max_monitored_databases);
+		       diskquota_worker_shmem_size() * diskquota_max_monitored_databases +
+		               hash_estimate_size(MAX_NUM_TABLE_SIZE_ENTRIES, TABLE_SIZE_MAP_ENTRY_SIZE) +
+		               hash_estimate_size(MAX_QUOTA_MAP_ENTRIES, QUOTA_INFO_MAP_ENTRY_SIZE));
 	else
 		Assert(pg_atomic_read_u64(diskquota_shmem_size) == 0);
 #endif
@@ -556,10 +558,10 @@ static Size
 diskquota_worker_shmem_size(void)
 {
 	Size size;
-	size = hash_estimate_size(MAX_NUM_TABLE_SIZE_ENTRIES, TABLE_SIZE_MAP_ENTRY_SIZE);
+	size = hash_estimate_size(INIT_NUM_TABLE_SIZE_ENTRIES, TABLE_SIZE_MAP_ENTRY_SIZE);
 	size = add_size(size,
 	                hash_estimate_size(diskquota_max_local_reject_entries, LOCAL_DISK_QUOTA_REJECT_MAP_ENTRY_SIZE));
-	size = add_size(size, hash_estimate_size(MAX_QUOTA_MAP_ENTRIES, QUOTA_INFO_MAP_ENTRY_SIZE));
+	size = add_size(size, hash_estimate_size(INIT_QUOTA_MAP_ENTRIES, QUOTA_INFO_MAP_ENTRY_SIZE));
 	size = add_size(size, TABLE_SIZE_MAP_LAST_OVERFLOW_REPORT_SIZE);
 	size = add_size(size, LOCAL_DISK_QUOTA_REJECT_MAP_LAST_OVERFLOW_REPORT_SIZE);
 	size = add_size(size, QUOTA_INFO_MAP_LAST_OVERFLOW_REPORT_SIZE);
@@ -590,6 +592,10 @@ DiskQuotaShmemSize(void)
 	if (IS_QUERY_DISPATCHER())
 	{
 		size = add_size(size, diskquota_launcher_shmem_size()); // DiskquotaLauncherShmem
+		size = add_size(size, DISKQUOTA_TABLE_SIZE_ENTRY_NUM_SIZE);
+		size = add_size(size, DISKQUOTA_QUOTA_INFO_ENTRY_NUM_SIZE);
+		size = add_size(size, hash_estimate_size(MAX_NUM_TABLE_SIZE_ENTRIES, TABLE_SIZE_MAP_ENTRY_SIZE));
+		size = add_size(size, hash_estimate_size(MAX_QUOTA_MAP_ENTRIES, QUOTA_INFO_MAP_ENTRY_SIZE));
 		size = add_size(size, diskquota_worker_shmem_size() * diskquota_max_monitored_databases);
 	}
 
@@ -607,12 +613,6 @@ init_disk_quota_model(uint32 id)
 	StringInfoData str;
 	bool           found;
 	initStringInfo(&str);
-
-#ifdef USE_ASSERT_CHECKING
-	Assert(DiskquotaLauncherShmem);
-
-	if (!DiskquotaLauncherShmem->isDynamicWorker) Assert(pg_atomic_read_u64(diskquota_shmem_size) >= 0);
-#endif
 
 	format_name("TableSizeEntrymap", id, &str);
 	memset(&hash_ctl, 0, sizeof(hash_ctl));
@@ -663,10 +663,6 @@ init_disk_quota_model(uint32 id)
 	if (!found) *quota_info_map_last_overflow_report = 0;
 
 	pfree(str.data);
-
-#ifdef USE_ASSERT_CHECKING
-	if (!DiskquotaLauncherShmem->isDynamicWorker) Assert(pg_atomic_read_u64(diskquota_shmem_size) >= 0);
-#endif
 }
 
 /*

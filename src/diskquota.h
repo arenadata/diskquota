@@ -82,6 +82,8 @@ extern int diskquota_worker_timeout;
 #define RELID_CACHE_ENTRY_SIZE sizeof(DiskQuotaRelidCacheEntry)
 #define ALTERED_RELOID_CACHE_ENTRY_SIZE sizeof(Oid)
 #define MONITORED_DBID_CACHE_ENTRY_SIZE sizeof(struct MonitorDBEntryStruct)
+#define DISKQUOTA_TABLE_SIZE_ENTRY_NUM_SIZE sizeof(pg_atomic_uint32)
+#define DISKQUOTA_QUOTA_INFO_ENTRY_NUM_SIZE sizeof(pg_atomic_uint32)
 
 typedef enum
 {

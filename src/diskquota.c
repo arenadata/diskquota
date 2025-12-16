@@ -1780,12 +1780,12 @@ init_launcher_shmem()
 	}
 	/* init TableSizeEntry counter */
 	diskquota_table_size_entry_num =
-	        ShmemInitStruct("diskquota TableSizeEntry counter", sizeof(pg_atomic_uint32), &found);
+	        DiskquotaShmemInitStruct("diskquota TableSizeEntry counter", DISKQUOTA_TABLE_SIZE_ENTRY_NUM_SIZE, &found);
 	if (!found) pg_atomic_init_u32(diskquota_table_size_entry_num, 0);
 
 	/* init QuotaInfoEntry counter */
 	diskquota_quota_info_entry_num =
-	        ShmemInitStruct("diskquota QuotaInfoEntry counter", sizeof(pg_atomic_uint32), &found);
+	        DiskquotaShmemInitStruct("diskquota QuotaInfoEntry counter", DISKQUOTA_QUOTA_INFO_ENTRY_NUM_SIZE, &found);
 	if (!found) pg_atomic_init_u32(diskquota_quota_info_entry_num, 0);
 }
 
