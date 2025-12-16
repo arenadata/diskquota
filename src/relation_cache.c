@@ -54,13 +54,13 @@ init_shm_worker_relation_cache(void)
 
 	memset(&ctl, 0, sizeof(ctl));
 	ctl.keysize    = sizeof(Oid);
-	ctl.entrysize  = sizeof(DiskQuotaRelationCacheEntry);
+	ctl.entrysize  = RELATION_CACHE_ENTRY_SIZE;
 	relation_cache = DiskquotaShmemInitHash("relation_cache", diskquota_max_active_tables, diskquota_max_active_tables,
 	                                        &ctl, HASH_ELEM, DISKQUOTA_OID_HASH);
 
 	memset(&ctl, 0, sizeof(ctl));
 	ctl.keysize   = sizeof(Oid);
-	ctl.entrysize = sizeof(DiskQuotaRelidCacheEntry);
+	ctl.entrysize = RELID_CACHE_ENTRY_SIZE;
 	relid_cache = DiskquotaShmemInitHash("relid_cache", diskquota_max_active_tables, diskquota_max_active_tables, &ctl,
 	                                     HASH_ELEM, DISKQUOTA_OID_HASH);
 }
@@ -198,7 +198,7 @@ update_relation_cache(Oid relid)
 		LWLockRelease(diskquota_locks.relation_cache_lock);
 		return;
 	}
-	memcpy(relation_entry, &relation_entry_data, sizeof(DiskQuotaRelationCacheEntry));
+	memcpy(relation_entry, &relation_entry_data, RELATION_CACHE_ENTRY_SIZE);
 
 	action      = check_hash_fullness(relid_cache, diskquota_max_active_tables, relid_cache_warning,
 	                                  &active_tables_map_last_overflow_report);
@@ -208,7 +208,7 @@ update_relation_cache(Oid relid)
 		LWLockRelease(diskquota_locks.relation_cache_lock);
 		return;
 	}
-	memcpy(relid_entry, &relid_entry_data, sizeof(DiskQuotaRelidCacheEntry));
+	memcpy(relid_entry, &relid_entry_data, RELID_CACHE_ENTRY_SIZE);
 	LWLockRelease(diskquota_locks.relation_cache_lock);
 
 	prelid = get_primary_table_oid(relid, false);
@@ -302,7 +302,7 @@ remove_committed_relation_from_cache(void)
 
 	memset(&ctl, 0, sizeof(ctl));
 	ctl.keysize   = sizeof(Oid);
-	ctl.entrysize = sizeof(DiskQuotaRelationCacheEntry);
+	ctl.entrysize = RELATION_CACHE_ENTRY_SIZE;
 	ctl.hcxt      = CurrentMemoryContext;
 	local_relation_cache =
 	        diskquota_hash_create("local relation cache", 1024, &ctl, HASH_ELEM | HASH_CONTEXT, DISKQUOTA_OID_HASH);
@@ -314,7 +314,7 @@ remove_committed_relation_from_cache(void)
 		/* The session of db1 should not see the table inside db2. */
 		if (entry->rnode.node.dbNode != MyDatabaseId) continue;
 		local_entry = hash_search(local_relation_cache, &entry->relid, HASH_ENTER, NULL);
-		memcpy(local_entry, entry, sizeof(DiskQuotaRelationCacheEntry));
+		memcpy(local_entry, entry, RELATION_CACHE_ENTRY_SIZE);
 	}
 	LWLockRelease(diskquota_locks.relation_cache_lock);
 
@@ -380,7 +380,7 @@ show_relation_cache(PG_FUNCTION_ARGS)
 		/* Create a local hash table and fill it with entries from shared memory. */
 		memset(&hashctl, 0, sizeof(hashctl));
 		hashctl.keysize   = sizeof(Oid);
-		hashctl.entrysize = sizeof(DiskQuotaRelationCacheEntry);
+		hashctl.entrysize = RELATION_CACHE_ENTRY_SIZE;
 		hashctl.hcxt      = CurrentMemoryContext;
 
 		relation_cache_ctx->relation_cache = diskquota_hash_create("relation_cache_ctx->relation_cache", 1024, &hashctl,
@@ -396,7 +396,7 @@ show_relation_cache(PG_FUNCTION_ARGS)
 			        hash_search(relation_cache_ctx->relation_cache, &entry->relid, HASH_ENTER_NULL, NULL);
 			if (local_entry)
 			{
-				memcpy(local_entry, entry, sizeof(DiskQuotaRelationCacheEntry));
+				memcpy(local_entry, entry, RELATION_CACHE_ENTRY_SIZE);
 			}
 		}
 		LWLockRelease(diskquota_locks.relation_cache_lock);
@@ -559,7 +559,7 @@ get_relation_entry(Oid relid, DiskQuotaRelationCacheEntry *entry)
 	tentry = hash_search(relation_cache, &relid, HASH_FIND, NULL);
 	if (tentry)
 	{
-		memcpy(entry, tentry, sizeof(DiskQuotaRelationCacheEntry));
+		memcpy(entry, tentry, RELATION_CACHE_ENTRY_SIZE);
 		LWLockRelease(diskquota_locks.relation_cache_lock);
 		return;
 	}

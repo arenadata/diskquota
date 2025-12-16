@@ -1136,7 +1136,7 @@ process_extension_ddl_message()
 	ExtensionDDLMessage local_extension_ddl_message;
 
 	LWLockAcquire(diskquota_locks.extension_ddl_message_lock, LW_SHARED);
-	memcpy(&local_extension_ddl_message, extension_ddl_message, sizeof(ExtensionDDLMessage));
+	memcpy(&local_extension_ddl_message, extension_ddl_message, EXTENSION_DDL_MESSAGE_SIZE);
 	LWLockRelease(diskquota_locks.extension_ddl_message_lock);
 
 	/* create/drop extension message must be valid */
@@ -1152,7 +1152,7 @@ process_extension_ddl_message()
 
 	/* Send createdrop extension diskquota result back to QD */
 	LWLockAcquire(diskquota_locks.extension_ddl_message_lock, LW_EXCLUSIVE);
-	memset(extension_ddl_message, 0, sizeof(ExtensionDDLMessage));
+	memset(extension_ddl_message, 0, EXTENSION_DDL_MESSAGE_SIZE);
 	extension_ddl_message->launcher_pid = MyProcPid;
 	extension_ddl_message->result       = (int)code;
 	LWLockRelease(diskquota_locks.extension_ddl_message_lock);
@@ -1738,8 +1738,8 @@ void
 init_launcher_shmem()
 {
 	bool found;
-	DiskquotaLauncherShmem = (DiskquotaLauncherShmemStruct *)ShmemInitStruct("Diskquota launcher Data",
-	                                                                         diskquota_launcher_shmem_size(), &found);
+	DiskquotaLauncherShmem = (DiskquotaLauncherShmemStruct *)DiskquotaShmemInitStruct(
+	        "Diskquota launcher Data", diskquota_launcher_shmem_size(), &found);
 	memset(DiskquotaLauncherShmem, 0, diskquota_launcher_shmem_size());
 	if (!found)
 	{

@@ -114,10 +114,9 @@ static float4 get_per_segment_ratio(Oid spcoid);
 static bool   to_delete_quota(QuotaType type, int64 quota_limit_mb, float4 segratio);
 static void   check_role(Oid roleoid, char *rolname, int64 quota_limit_mb);
 
-extern DiskquotaLauncherShmemStruct *DiskquotaLauncherShmem;
-
 #ifdef USE_ASSERT_CHECKING
-extern pg_atomic_uint64 *diskquota_shmem_size;
+extern DiskquotaLauncherShmemStruct *DiskquotaLauncherShmem;
+extern void                          diskquota_shmem_size_sub(Size size);
 #endif
 
 /* ---- Help Functions to set quota limit. ---- */
@@ -1650,8 +1649,9 @@ DiskquotaShmemInitHash(const char           *name,       /* table string name fo
 {
 #ifdef USE_ASSERT_CHECKING
 	if (!DiskquotaLauncherShmem || !DiskquotaLauncherShmem->isDynamicWorker)
-		pg_atomic_sub_fetch_u64(diskquota_shmem_size, hash_estimate_size(max_size, infoP->entrysize));
+		diskquota_shmem_size_sub(hash_estimate_size(max_size, infoP->entrysize));
 #endif
+
 #if GP_VERSION_NUM < 70000
 	if (hashFunction == DISKQUOTA_TAG_HASH)
 		infoP->hash = tag_hash;
@@ -1663,6 +1663,16 @@ DiskquotaShmemInitHash(const char           *name,       /* table string name fo
 #else
 	return ShmemInitHash(name, init_size, max_size, infoP, hash_flags | HASH_BLOBS);
 #endif /* GP_VERSION_NUM */
+}
+
+void *
+DiskquotaShmemInitStruct(const char *name, Size size, bool *foundPtr)
+{
+#ifdef USE_ASSERT_CHECKING
+	if (!DiskquotaLauncherShmem || !DiskquotaLauncherShmem->isDynamicWorker) diskquota_shmem_size_sub(size);
+#endif
+
+	return ShmemInitStruct(name, size, foundPtr);
 }
 
 HASHACTION
