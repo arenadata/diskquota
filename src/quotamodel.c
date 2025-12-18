@@ -519,14 +519,17 @@ disk_quota_shmem_startup(void)
 
 #ifdef USE_ASSERT_CHECKING
 	if (IS_QUERY_DISPATCHER())
+	{
+		int table_size_map_size =
+		        MAX_NUM_TABLE_SIZE_ENTRIES - INIT_NUM_TABLE_SIZE_ENTRIES * diskquota_max_monitored_databases;
+		int quota_info_map_size = MAX_QUOTA_MAP_ENTRIES - INIT_QUOTA_MAP_ENTRIES * diskquota_max_monitored_databases;
 		Assert(pg_atomic_read_u64(diskquota_shmem_size) ==
 		       diskquota_worker_shmem_size() * diskquota_max_monitored_databases +
-		               hash_estimate_size(MAX_NUM_TABLE_SIZE_ENTRIES -
-		                                          INIT_NUM_TABLE_SIZE_ENTRIES * diskquota_max_monitored_databases,
+		               hash_estimate_size(table_size_map_size > 0 ? table_size_map_size : 0,
 		                                  TABLE_SIZE_MAP_ENTRY_SIZE) +
-		               hash_estimate_size(
-		                       MAX_QUOTA_MAP_ENTRIES - INIT_QUOTA_MAP_ENTRIES * diskquota_max_monitored_databases,
-		                       QUOTA_INFO_MAP_ENTRY_SIZE));
+		               hash_estimate_size(quota_info_map_size > 0 ? quota_info_map_size : 0,
+		                                  QUOTA_INFO_MAP_ENTRY_SIZE));
+	}
 	else
 		Assert(pg_atomic_read_u64(diskquota_shmem_size) == 0);
 #endif
@@ -641,14 +644,17 @@ DiskQuotaShmemSize(void)
 		size = add_size(size, DISKQUOTA_TABLE_SIZE_ENTRY_NUM_SIZE);
 		/* request size for diskquota_quota_info_entry_num in entire coordinator */
 		size = add_size(size, DISKQUOTA_QUOTA_INFO_ENTRY_NUM_SIZE);
+
+		int table_size_map_size =
+		        MAX_NUM_TABLE_SIZE_ENTRIES - INIT_NUM_TABLE_SIZE_ENTRIES * diskquota_max_monitored_databases;
+		int quota_info_map_size = MAX_QUOTA_MAP_ENTRIES - INIT_QUOTA_MAP_ENTRIES * diskquota_max_monitored_databases;
+
 		/* request maximum size for table_size_map in entire coordinator */
-		size = add_size(size, hash_estimate_size(MAX_NUM_TABLE_SIZE_ENTRIES - INIT_NUM_TABLE_SIZE_ENTRIES *
-		                                                                              diskquota_max_monitored_databases,
-		                                         TABLE_SIZE_MAP_ENTRY_SIZE));
+		size = add_size(
+		        size, hash_estimate_size(table_size_map_size > 0 ? table_size_map_size : 0, TABLE_SIZE_MAP_ENTRY_SIZE));
 		/* request maximum size for quota_info_map in entire coordinator */
-		size = add_size(size, hash_estimate_size(MAX_QUOTA_MAP_ENTRIES -
-		                                                 INIT_QUOTA_MAP_ENTRIES * diskquota_max_monitored_databases,
-		                                         QUOTA_INFO_MAP_ENTRY_SIZE));
+		size = add_size(
+		        size, hash_estimate_size(quota_info_map_size > 0 ? quota_info_map_size : 0, QUOTA_INFO_MAP_ENTRY_SIZE));
 		/* request sizes in each coordinator worker */
 		size = add_size(size, diskquota_worker_shmem_size() * diskquota_max_monitored_databases);
 	}
