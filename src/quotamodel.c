@@ -568,17 +568,23 @@ init_lwlocks(void)
 static Size
 diskquota_worker_shmem_size(void)
 {
-	Size size;
-	size = hash_estimate_size(INIT_NUM_TABLE_SIZE_ENTRIES, TABLE_SIZE_MAP_ENTRY_SIZE);
-	size = add_size(size,
-	                hash_estimate_size(diskquota_max_local_reject_entries, LOCAL_DISK_QUOTA_REJECT_MAP_ENTRY_SIZE));
-	size = add_size(size, hash_estimate_size(INIT_QUOTA_MAP_ENTRIES, QUOTA_INFO_MAP_ENTRY_SIZE));
-	size = add_size(size, TABLE_SIZE_MAP_LAST_OVERFLOW_REPORT_SIZE);
-	size = add_size(size, LOCAL_DISK_QUOTA_REJECT_MAP_LAST_OVERFLOW_REPORT_SIZE);
-	size = add_size(size, QUOTA_INFO_MAP_LAST_OVERFLOW_REPORT_SIZE);
+	Size size = 0;
+
 #ifdef USE_ASSERT_CHECKING
 	size = add_size(size, LOCAL_DISK_QUOTA_REJECT_FLAG_SIZE);
 #endif
+
+	size = add_size(size, hash_estimate_size(INIT_NUM_TABLE_SIZE_ENTRIES / diskquota_max_monitored_databases,
+	                                         TABLE_SIZE_MAP_ENTRY_SIZE));
+	size = add_size(size,
+	                hash_estimate_size(diskquota_max_local_reject_entries, LOCAL_DISK_QUOTA_REJECT_MAP_ENTRY_SIZE));
+	size = add_size(size, hash_estimate_size(INIT_QUOTA_MAP_ENTRIES / diskquota_max_monitored_databases,
+	                                         QUOTA_INFO_MAP_ENTRY_SIZE));
+
+	size = add_size(size, TABLE_SIZE_MAP_LAST_OVERFLOW_REPORT_SIZE);
+	size = add_size(size, LOCAL_DISK_QUOTA_REJECT_MAP_LAST_OVERFLOW_REPORT_SIZE);
+	size = add_size(size, QUOTA_INFO_MAP_LAST_OVERFLOW_REPORT_SIZE);
+
 	return size;
 }
 
@@ -589,13 +595,13 @@ diskquota_worker_shmem_size(void)
 static Size
 DiskQuotaShmemSize(void)
 {
-	Size size;
-	size = EXTENSION_DDL_MESSAGE_SIZE;
+	Size size = 0;
 
 #ifdef USE_ASSERT_CHECKING
 	size = add_size(size, sizeof(pg_atomic_uint64)); // diskquota_shmem_size
 #endif
 
+	size = add_size(size, EXTENSION_DDL_MESSAGE_SIZE);
 	size = add_size(size, hash_estimate_size(MAX_DISK_QUOTA_REJECT_ENTRIES, DISK_QUOTA_REJECT_MAP_ENTRY_SIZE));
 	size = add_size(size, hash_estimate_size(diskquota_max_active_tables, ACTIVE_TABLES_MAP_ENTRY_SIZE));
 	size = add_size(size, hash_estimate_size(diskquota_max_active_tables, RELATION_CACHE_ENTRY_SIZE));
