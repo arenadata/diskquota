@@ -97,9 +97,9 @@ extern pg_atomic_uint32 *diskquota_table_size_entry_num;
 extern pg_atomic_uint32 *diskquota_quota_info_entry_num;
 
 #ifdef USE_ASSERT_CHECKING
-extern pg_atomic_flag *diskquota_table_size_flag;
-pg_atomic_flag        *dlocal_disk_quota_reject_flag;
-extern pg_atomic_flag *diskquota_quota_info_flag;
+pg_atomic_flag *diskquota_table_size_flag;
+pg_atomic_flag *dlocal_disk_quota_reject_flag;
+pg_atomic_flag *diskquota_quota_info_flag;
 #else
 #define diskquota_table_size_flag NULL
 #define dlocal_disk_quota_reject_flag NULL

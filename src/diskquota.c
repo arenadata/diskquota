@@ -100,8 +100,8 @@ pg_atomic_uint32 *diskquota_table_size_entry_num;
 pg_atomic_uint32 *diskquota_quota_info_entry_num;
 
 #ifdef USE_ASSERT_CHECKING
-pg_atomic_flag *diskquota_table_size_flag;
-pg_atomic_flag *diskquota_quota_info_flag;
+extern pg_atomic_flag *diskquota_table_size_flag;
+extern pg_atomic_flag *diskquota_quota_info_flag;
 #endif
 
 #define MIN_SLEEPTIME 100         /* milliseconds */
