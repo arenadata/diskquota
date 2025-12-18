@@ -1661,9 +1661,9 @@ DiskquotaShmemInitHash(const char           *name,       /* table string name fo
 #endif /* GP_VERSION_NUM */
 
 #ifdef USE_ASSERT_CHECKING
-	AssertImply(IsBackgroundWorker, foundPtr); /* foundPtr only used in background worker */
+	AssertImply(IsBackgroundWorker, foundPtr != NULL); /* foundPtr only used in background worker */
 
-	if (!foundPtr || pg_atomic_test_set_flag(foundPtr))
+	if (foundPtr == NULL || pg_atomic_test_set_flag(foundPtr))
 		diskquota_shmem_size_sub(hash_estimate_size(max_size, infoP->entrysize));
 #endif
 
